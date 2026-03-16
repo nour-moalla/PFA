@@ -1,0 +1,5 @@
+# This file ensures the data directory is tracked by git
+# Place your data files here:
+# - skill_summary_ranked.csv (for career insights)
+# - jobs_database.csv (for job matching)
+
