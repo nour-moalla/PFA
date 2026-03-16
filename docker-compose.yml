@@ -1,0 +1,17 @@
+
+services:
+  backend:
+    build: ./backend
+    container_name: utopiahire-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+
+  frontend:
+    build: ./frontend
+    container_name: utopiahire-frontend
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./frontend/.env
