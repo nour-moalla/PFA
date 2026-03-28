@@ -23,7 +23,7 @@ jobs:
 
     #  Build
     - name: Build Docker Images
-      run: docker-compose build
+      run: docker compose build
 
     #  Deploy
     - name: Deploy to Server
