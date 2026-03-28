@@ -55,3 +55,6 @@ data/*.json
 .DS_Store
 Thumbs.db
 
+
+backend/packages/
+*.whl
