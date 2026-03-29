@@ -3,7 +3,7 @@ AI Interview Router
 Handles AI-powered interview sessions
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from datetime import datetime
@@ -12,6 +12,7 @@ import uuid
 from app.core.ai_service import ai_service
 from app.core.resume_parser import ResumeParser
 from app.core.config import settings
+from app.core.auth import AuthUser, get_current_user
 
 router = APIRouter()
 
@@ -20,6 +21,17 @@ interview_sessions: Dict[str, Dict] = {}
 
 # Initialize resume parser
 resume_parser = ResumeParser()
+
+
+def _get_owned_session(session_id: str, user_uid: str) -> Dict:
+    """Return interview session if it belongs to the authenticated user."""
+    if session_id not in interview_sessions:
+        raise HTTPException(status_code=404, detail="Invalid session ID")
+
+    session = interview_sessions[session_id]
+    if session.get("owner_uid") != user_uid:
+        raise HTTPException(status_code=403, detail="You are not allowed to access this session")
+    return session
 
 
 class InterviewStartRequest(BaseModel):
@@ -212,7 +224,10 @@ Make sure to include all the markers. The question should be appropriate for a {
 
 
 @router.post("/start")
-async def start_interview(request: InterviewStartRequest):
+async def start_interview(
+    request: InterviewStartRequest,
+    current_user: AuthUser = Depends(get_current_user),
+):
     """
     Start a new interview session
     
@@ -241,7 +256,8 @@ async def start_interview(request: InterviewStartRequest):
         'interviewer': interviewer,
         'cv_summary': cv_summary,
         'role': request.role,
-        'created_at': datetime.now().isoformat()
+        'created_at': datetime.now().isoformat(),
+        'owner_uid': current_user.uid,
     }
     
     return {
@@ -255,7 +271,10 @@ async def start_interview(request: InterviewStartRequest):
 
 
 @router.post("/answer")
-async def submit_answer(request: InterviewAnswerRequest):
+async def submit_answer(
+    request: InterviewAnswerRequest,
+    current_user: AuthUser = Depends(get_current_user),
+):
     """
     Submit an answer and get the next question or feedback
     
@@ -263,10 +282,8 @@ async def submit_answer(request: InterviewAnswerRequest):
     - **answer**: Candidate's answer
     - **is_code**: Whether the answer is code
     """
-    if request.session_id not in interview_sessions:
-        raise HTTPException(status_code=404, detail="Invalid session ID")
-    
-    interviewer = interview_sessions[request.session_id]['interviewer']
+    session = _get_owned_session(request.session_id, current_user.uid)
+    interviewer = session['interviewer']
     
     if interviewer.is_finished:
         return {
@@ -291,12 +308,13 @@ async def submit_answer(request: InterviewAnswerRequest):
 
 
 @router.get("/history/{session_id}")
-async def get_history(session_id: str):
+async def get_history(
+    session_id: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
     """Get interview history for a session"""
-    if session_id not in interview_sessions:
-        raise HTTPException(status_code=404, detail="Invalid session ID")
-    
-    interviewer = interview_sessions[session_id]['interviewer']
+    session = _get_owned_session(session_id, current_user.uid)
+    interviewer = session['interviewer']
     history = interviewer.get_history()
     
     return {
@@ -307,12 +325,13 @@ async def get_history(session_id: str):
 
 
 @router.get("/scores/{session_id}")
-async def get_scores(session_id: str):
+async def get_scores(
+    session_id: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
     """Get interview scores for a session"""
-    if session_id not in interview_sessions:
-        raise HTTPException(status_code=404, detail="Invalid session ID")
-    
-    interviewer = interview_sessions[session_id]['interviewer']
+    session = _get_owned_session(session_id, current_user.uid)
+    interviewer = session['interviewer']
     scores_data = interviewer.get_scores()
     
     return {
@@ -322,12 +341,13 @@ async def get_scores(session_id: str):
 
 
 @router.post("/code-question/{session_id}")
-async def request_code_question(session_id: str):
+async def request_code_question(
+    session_id: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
     """Request AI to provide a properly formatted code question"""
-    if session_id not in interview_sessions:
-        raise HTTPException(status_code=404, detail="Invalid session ID")
-    
-    interviewer = interview_sessions[session_id]['interviewer']
+    session = _get_owned_session(session_id, current_user.uid)
+    interviewer = session['interviewer']
     
     response = interviewer.request_code_question()
     
@@ -338,8 +358,12 @@ async def request_code_question(session_id: str):
 
 
 @router.delete("/session/{session_id}")
-async def end_session(session_id: str):
+async def end_session(
+    session_id: str,
+    current_user: AuthUser = Depends(get_current_user),
+):
     """End interview session and cleanup"""
+    _get_owned_session(session_id, current_user.uid)
     if session_id in interview_sessions:
         del interview_sessions[session_id]
         return {"message": "Session ended successfully"}

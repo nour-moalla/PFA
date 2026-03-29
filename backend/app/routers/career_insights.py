@@ -304,13 +304,17 @@ def create_pdf(content: str, filename: str = "roadmap.pdf") -> Optional[str]:
 @router.get("/download/{filename}")
 async def download_pdf(filename: str):
     """Download generated roadmap PDF"""
-    filepath = Path("static") / filename
+    safe_name = Path(filename).name
+    if safe_name != filename or not safe_name.startswith("roadmap_") or not safe_name.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    filepath = Path("static") / safe_name
     if not filepath.exists():
         raise HTTPException(status_code=404, detail="File not found")
     
     return FileResponse(
         path=str(filepath),
         media_type="application/pdf",
-        filename=filename
+        filename=safe_name
     )
 

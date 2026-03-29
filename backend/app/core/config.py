@@ -23,6 +23,10 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "http://localhost:5174",
     ]
+
+    # Authentication (Firebase Admin)
+    FIREBASE_CREDENTIALS_JSON: str = os.getenv("FIREBASE_CREDENTIALS_JSON", "")
+    FIREBASE_CREDENTIALS_FILE: str = os.getenv("FIREBASE_CREDENTIALS_FILE", "")
     
     # AI Service Configuration
     AI_API_KEY: str = os.getenv("AI_API_KEY", "")

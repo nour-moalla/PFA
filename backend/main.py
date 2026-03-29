@@ -7,7 +7,7 @@ Combines features from:
 - Job Matcher
 """
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 
@@ -18,6 +18,7 @@ from app.routers import (
     job_matching
 )
 from app.core.config import settings
+from app.core.auth import get_current_user
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -31,17 +32,37 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["settings.CORS_ORIGINS"],  # Allow all origins in development (change to settings.CORS_ORIGINS in production)
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Include routers
-app.include_router(resume.router, prefix="/api/resume", tags=["Resume Analysis"])
-app.include_router(interview.router, prefix="/api/interview", tags=["AI Interview"])
-app.include_router(career_insights.router, prefix="/api/career", tags=["Career Insights"])
-app.include_router(job_matching.router, prefix="/api/jobs", tags=["Job Matching"])
+app.include_router(
+    resume.router,
+    prefix="/api/resume",
+    tags=["Resume Analysis"],
+    dependencies=[Depends(get_current_user)],
+)
+app.include_router(
+    interview.router,
+    prefix="/api/interview",
+    tags=["AI Interview"],
+    dependencies=[Depends(get_current_user)],
+)
+app.include_router(
+    career_insights.router,
+    prefix="/api/career",
+    tags=["Career Insights"],
+    dependencies=[Depends(get_current_user)],
+)
+app.include_router(
+    job_matching.router,
+    prefix="/api/jobs",
+    tags=["Job Matching"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @app.get("/", tags=["Health"])
