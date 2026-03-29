@@ -6,6 +6,7 @@ Handles career analysis, skill gap identification, and roadmap generation
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from pathlib import Path
+import logging
 import pandas as pd
 import numpy as np
 from typing import List, Dict, Optional
@@ -23,6 +24,7 @@ import hdbscan
 from sklearn.decomposition import PCA
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Initialize resume parser
 resume_parser = ResumeParser()
@@ -290,7 +292,7 @@ def create_pdf(content: str, filename: str = "roadmap.pdf") -> Optional[str]:
         pdf.output(str(pdf_path))
         return str(pdf_path)
     except Exception as e:
-        print(f"PDF generation error: {e}")
+        logger.error("PDF generation error: %s", str(e))
         return None
 
 

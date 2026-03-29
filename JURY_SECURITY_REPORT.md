@@ -14,6 +14,7 @@ The implementation covered:
 - Missing rate limits on expensive endpoints
 - Prompt injection resistance for LLM calls
 - File upload hardening with MIME verification and size limits
+- Structured JSON logging for backend observability and incident response
 
 ---
 
@@ -28,6 +29,7 @@ Result:
 - Malicious instructions inside resumes/CV text are treated as data, not executable instructions.
 - Renamed or fake PDF uploads are blocked by content-based MIME checks.
 - Uploaded files are stored with UUID names only (no user-controlled filename usage).
+- Backend runtime events now use structured JSON logs instead of ad-hoc print output.
 
 ---
 
@@ -155,6 +157,31 @@ Impact:
 
 ---
 
+### H) Unstructured Runtime Logging (print Statements)
+Problem:
+- The backend used `print()` statements in core services and routers.
+- Print logs are inconsistent and difficult to query in observability pipelines.
+- Uncontrolled logging increases risk of accidentally exposing sensitive data.
+
+Fix:
+- Added centralized structured logging configuration in backend startup with Python `logging`.
+- Configured JSON-style log format:
+  - time
+  - level
+  - msg
+- Replaced print statements with level-appropriate logger calls:
+  - `logger.info(...)` for startup/configuration events
+  - `logger.warning(...)` for recoverable conditions
+  - `logger.error(...)` for failures
+- Removed API key logging from AI service startup logs.
+
+Impact:
+- Logs are machine-readable and ready for dashboards/alerting stacks.
+- Operational troubleshooting is faster and more reliable.
+- Reduced risk of secret leakage through console output.
+
+---
+
 ## 4. Files Added / Modified
 
 ### Added
@@ -172,6 +199,7 @@ Impact:
   - Fixed CORS origins usage.
   - Added auth dependency on sensitive routers.
   - Wired rate-limit exception handling and limiter state.
+  - Added centralized structured JSON logging configuration.
 - `backend/app/core/config.py`
   - Added Firebase auth settings:
   - `FIREBASE_CREDENTIALS_JSON`
@@ -181,11 +209,13 @@ Impact:
 - `backend/app/routers/career_insights.py`
   - Hardened download filename validation.
   - Replaced extension-only upload checks with shared PDF content validation.
+  - Replaced PDF generation print errors with structured logger errors.
 - `backend/app/routers/resume.py`
   - Added rate-limit decorator and `Request` parameter on `/analyze`.
   - Replaced extension-only upload checks with shared PDF content validation.
 - `backend/app/routers/job_matching.py`
   - Replaced extension-only upload checks with shared PDF content validation.
+  - Replaced print diagnostics with structured warning/error logs.
 - `backend/app/core/ai_service.py`
   - Added XML data-block wrapper helper with escaping for untrusted content.
   - Hardened prompt templates with explicit anti-injection rules across:
@@ -195,6 +225,7 @@ Impact:
   - roadmap generation
   - CV structured extraction
   - resume summary
+  - Replaced print startup/retry logs with structured logger calls and removed API key logging.
 - `frontend/src/api/client.js`
   - Added Axios interceptor to attach Firebase ID token in `Authorization` header.
 - `backend/requirements.in`
@@ -221,6 +252,7 @@ Behavior:
 - No syntax/analysis errors reported in the updated files.
 - Git diff confirmed route decorators, ownership checks, limiter wiring, dependency updates, and prompt-injection hardening in AI service.
 - Git diff confirmed secure upload refactor (magic-byte MIME check, size cap, UUID storage names) across all three upload routers.
+- Codebase search confirmed print statements were removed from backend Python modules and replaced with structured logging.
 
 ---
 
@@ -234,6 +266,7 @@ Security outcomes achieved:
 - Abuse resistance for expensive AI endpoints
 - Prompt injection mitigation via strict data delimitation and explicit model constraints
 - Stronger file upload security against spoofed extensions and malicious payload delivery
+- Production-grade observability via structured JSON logs
 - Better production readiness and compliance posture
 
 ---
@@ -247,5 +280,6 @@ Security outcomes achieved:
 6. Upload a real PDF -> accepted.
 7. Rename a `.txt` file to `.pdf` and upload -> rejected with HTTP 400.
 8. Upload a file larger than 5MB -> rejected with HTTP 400.
+9. Start backend and hit endpoints -> logs appear in JSON format with `time`, `level`, and `msg` fields.
 
 These scenarios demonstrate that access control and abuse protections are active and effective.

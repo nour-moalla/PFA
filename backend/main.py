@@ -7,6 +7,7 @@ Combines features from:
 - Job Matcher
 """
 
+import logging
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
@@ -25,6 +26,12 @@ from app.core.config import settings
 from app.core.auth import get_current_user
 from app.core.rate_limit import limiter
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='{"time":"%(asctime)s","level":"%(levelname)s","msg":"%(message)s"}',
+)
+logger = logging.getLogger(__name__)
+
 # Initialize FastAPI app
 app = FastAPI(
     title="UtopiaHire Career Services API",
@@ -33,6 +40,8 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+logger.info("Application started successfully")
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

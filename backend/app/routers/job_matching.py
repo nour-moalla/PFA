@@ -7,6 +7,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime
+import logging
 import pandas as pd
 import numpy as np
 # Temporarily commented due to Python 3.13 compatibility issues
@@ -20,6 +21,7 @@ from app.core.upload_validation import validate_pdf_upload
 # from sentence_transformers import SentenceTransformer, util
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Initialize resume parser
 resume_parser = ResumeParser()
@@ -66,7 +68,7 @@ def load_jobs_database():
         
         return jobs_df, job_embeddings
     except Exception as e:
-        print(f"Error loading jobs database: {e}")
+        logger.error("Error loading jobs database: %s", str(e))
         return None, None
 
 
@@ -168,7 +170,7 @@ async def match_cv(file: UploadFile = File(...)):
                 })
             except Exception as e:
                 # Skip invalid results but continue processing
-                print(f"Warning: Skipping invalid search result: {e}")
+                logger.warning("Skipping invalid search result: %s", str(e))
                 continue
         
         return {

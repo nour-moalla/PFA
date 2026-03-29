@@ -7,6 +7,11 @@ WORKDIR /app
 # Copy requirements
 COPY requirements.txt .
 
+# Install system dependencies for python-magic
+RUN apt-get update && apt-get install -y \
+    libmagic1 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt --default-timeout=600 --retries=10
 
