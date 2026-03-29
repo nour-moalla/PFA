@@ -7,6 +7,7 @@ Combines features from:
 - Job Matcher
 """
 
+import logging
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
@@ -19,6 +20,13 @@ from app.routers import (
 )
 from app.core.config import settings
 from app.core.auth import get_current_user
+
+# Configure structured logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='{"time":"%(asctime)s","level":"%(levelname)s","msg":"%(message)s"}'
+)
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -64,6 +72,8 @@ app.include_router(
     dependencies=[Depends(get_current_user)],
 )
 
+logger.info("UtopiaHire Career Services API started successfully")
+
 
 @app.get("/", tags=["Health"])
 async def root():
@@ -90,3 +100,4 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
+@app.post("/api/resume/analyze")

@@ -3,6 +3,7 @@ Unified AI Service
 Handles all AI/LLM interactions using a single model
 """
 
+import logging
 import os
 import json
 import time
@@ -12,6 +13,8 @@ from datetime import datetime
 from openai import OpenAI
 from openai import APIError
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class AIService:
@@ -29,10 +32,10 @@ class AIService:
         self.model = settings.AI_MODEL
         
         # Log configuration (without exposing API key)
-        print(f"AI Service initialized:")
-        print(f"  Base URL: {settings.AI_BASE_URL}")
-        print(f"  Model: {self.model}")
-        print(f"  API Key: {'*' * (len(settings.AI_API_KEY) - 4) + settings.AI_API_KEY[-4:] if len(settings.AI_API_KEY) > 4 else '***'}")
+        logger.info("AI Service initialized")
+        logger.info("Base URL: %s", settings.AI_BASE_URL)
+        logger.info("Model: %s", self.model)
+        logger.info("API Key configured: %s", '*' * (len(settings.AI_API_KEY) - 4) + settings.AI_API_KEY[-4:] if len(settings.AI_API_KEY) > 4 else '***')
     
     def _generate_with_retries(
         self,
@@ -99,10 +102,7 @@ class AIService:
                 delay = min(max_delay, base_delay * (2 ** (attempt - 1)))
                 jitter = random.uniform(0, delay * 0.1)
                 sleep_time = delay + jitter
-                print(
-                    f"Rate limit encountered (attempt {attempt}/{max_retries}). "
-                    f"Retrying in {sleep_time:.1f}s..."
-                )
+                logger.warning("Rate limit encountered (attempt %d/%d). Retrying in %.1fs", attempt, max_retries, sleep_time)
                 time.sleep(sleep_time)
     
     def chat_completion(

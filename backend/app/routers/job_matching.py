@@ -3,6 +3,7 @@ Job Matching Router
 Handles CV-to-job matching using semantic search
 """
 
+import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -18,6 +19,8 @@ from app.core.ai_service import ai_service
 from app.core.resume_parser import ResumeParser
 from app.core.config import settings
 # from sentence_transformers import SentenceTransformer, util
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -66,7 +69,7 @@ def load_jobs_database():
         
         return jobs_df, job_embeddings
     except Exception as e:
-        print(f"Error loading jobs database: {e}")
+        logger.error("Error loading jobs database: %s", str(e))
         return None, None
 
 
@@ -172,7 +175,7 @@ async def match_cv(file: UploadFile = File(...)):
                 })
             except Exception as e:
                 # Skip invalid results but continue processing
-                print(f"Warning: Skipping invalid search result: {e}")
+                logger.warning("Skipping invalid search result: %s", str(e))
                 continue
         
         return {

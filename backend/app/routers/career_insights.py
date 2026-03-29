@@ -3,6 +3,7 @@ Career Insights Router
 Handles career analysis, skill gap identification, and roadmap generation
 """
 
+import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from pathlib import Path
@@ -18,6 +19,8 @@ import uuid
 from app.core.ai_service import ai_service
 from app.core.resume_parser import ResumeParser
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 from sentence_transformers import SentenceTransformer
 import hdbscan
 from sklearn.decomposition import PCA
@@ -297,7 +300,7 @@ def create_pdf(content: str, filename: str = "roadmap.pdf") -> Optional[str]:
         pdf.output(str(pdf_path))
         return str(pdf_path)
     except Exception as e:
-        print(f"PDF generation error: {e}")
+        logger.error("PDF generation error: %s", str(e))
         return None
 
 
