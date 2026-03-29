@@ -3,7 +3,7 @@ Resume Analysis Router
 Handles resume/CV upload, parsing, and ATS analysis
 """
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
 from typing import Optional
 from pathlib import Path
 from datetime import datetime
@@ -13,6 +13,7 @@ import uuid
 from app.core.resume_parser import ResumeParser
 from app.core.ai_service import ai_service
 from app.core.config import settings
+from app.core.rate_limit import limiter
 
 router = APIRouter()
 
@@ -74,7 +75,9 @@ async def upload_resume(
 
 
 @router.post("/analyze")
+@limiter.limit("10/minute")
 async def analyze_resume(
+    request: Request,
     file: UploadFile = File(...),
     job_description: Optional[str] = Form(None),
     job_title: Optional[str] = Form(None),
