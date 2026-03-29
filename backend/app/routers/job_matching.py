@@ -8,6 +8,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime
+import logging
 import pandas as pd
 import numpy as np
 # Temporarily commented due to Python 3.13 compatibility issues
@@ -23,6 +24,7 @@ from app.core.upload_validation import validate_pdf_upload
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Initialize resume parser
 resume_parser = ResumeParser()
