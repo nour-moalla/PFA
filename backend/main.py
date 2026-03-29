@@ -8,9 +8,13 @@ Combines features from:
 """
 
 import logging
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
+
 
 from app.routers import (
     resume,
@@ -20,6 +24,7 @@ from app.routers import (
 )
 from app.core.config import settings
 from app.core.auth import get_current_user
+from app.core.rate_limit import limiter
 
 # Configure structured logging
 logging.basicConfig(
@@ -36,6 +41,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS configuration
 app.add_middleware(
@@ -100,4 +108,13 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
-@app.post("/api/resume/analyze")
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=63072000"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+

@@ -3,16 +3,17 @@ Resume Analysis Router
 Handles resume/CV upload, parsing, and ATS analysis
 """
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
 from typing import Optional
 from pathlib import Path
 from datetime import datetime
 import os
-import uuid
 
 from app.core.resume_parser import ResumeParser
 from app.core.ai_service import ai_service
 from app.core.config import settings
+from app.core.rate_limit import limiter
+from app.core.upload_validation import validate_pdf_upload
 
 router = APIRouter()
 
@@ -37,20 +38,16 @@ async def upload_resume(
     - **company**: Optional company name
     - **experience**: Optional years of experience
     """
-    # Validate file type
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
-    
     # Save uploaded file
     save_folder = Path(settings.UPLOAD_FOLDER)
     save_folder.mkdir(parents=True, exist_ok=True)
-    
-    file_id = str(uuid.uuid4())
-    save_path = save_folder / f"{file_id}_{file.filename}"
+
+    content, safe_name = await validate_pdf_upload(file)
+    save_path = save_folder / safe_name
+    file_id = Path(safe_name).stem
     
     try:
         with open(save_path, "wb") as f:
-            content = await file.read()
             f.write(content)
         
         # Parse resume
@@ -74,7 +71,9 @@ async def upload_resume(
 
 
 @router.post("/analyze")
+@limiter.limit("10/minute")
 async def analyze_resume(
+    request: Request,
     file: UploadFile = File(...),
     job_description: Optional[str] = Form(None),
     job_title: Optional[str] = Form(None),
@@ -92,20 +91,15 @@ async def analyze_resume(
     - Improvement suggestions
     - Top matches and gaps
     """
-    # Validate file type
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
-    
     # Save uploaded file
     save_folder = Path(settings.UPLOAD_FOLDER)
     save_folder.mkdir(parents=True, exist_ok=True)
-    
-    file_id = str(uuid.uuid4())
-    save_path = save_folder / f"{file_id}_{file.filename}"
+
+    content, safe_name = await validate_pdf_upload(file)
+    save_path = save_folder / safe_name
     
     try:
         with open(save_path, "wb") as f:
-            content = await file.read()
             f.write(content)
         
         # Parse resume
@@ -151,20 +145,15 @@ async def extract_skills(file: UploadFile = File(...)):
     
     Returns a list of detected technical skills
     """
-    # Validate file type
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
-    
     # Save uploaded file
     save_folder = Path(settings.UPLOAD_FOLDER)
     save_folder.mkdir(parents=True, exist_ok=True)
-    
-    file_id = str(uuid.uuid4())
-    save_path = save_folder / f"{file_id}_{file.filename}"
+
+    content, safe_name = await validate_pdf_upload(file)
+    save_path = save_folder / safe_name
     
     try:
         with open(save_path, "wb") as f:
-            content = await file.read()
             f.write(content)
         
         # Extract text
