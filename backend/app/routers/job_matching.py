@@ -12,11 +12,11 @@ import numpy as np
 # Temporarily commented due to Python 3.13 compatibility issues
 # import torch
 import ast
-import uuid
 
 from app.core.ai_service import ai_service
 from app.core.resume_parser import ResumeParser
 from app.core.config import settings
+from app.core.upload_validation import validate_pdf_upload
 # from sentence_transformers import SentenceTransformer, util
 
 router = APIRouter()
@@ -77,9 +77,6 @@ async def match_cv(file: UploadFile = File(...)):
     
     Returns top matching jobs based on semantic similarity
     """
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported")
-    
     # Load jobs database
     jobs_df, job_embeddings = load_jobs_database()
     
@@ -92,13 +89,12 @@ async def match_cv(file: UploadFile = File(...)):
     # Save uploaded file
     save_folder = Path(settings.UPLOAD_FOLDER)
     save_folder.mkdir(parents=True, exist_ok=True)
-    
-    file_id = str(uuid.uuid4())
-    save_path = save_folder / f"{file_id}_{file.filename}"
+
+    content, safe_name = await validate_pdf_upload(file)
+    save_path = save_folder / safe_name
     
     try:
         with open(save_path, "wb") as f:
-            content = await file.read()
             f.write(content)
         
         # Extract text from CV

@@ -13,11 +13,11 @@ import json
 from fpdf import FPDF
 import os
 import time
-import uuid
 
 from app.core.ai_service import ai_service
 from app.core.resume_parser import ResumeParser
 from app.core.config import settings
+from app.core.upload_validation import validate_pdf_upload
 from sentence_transformers import SentenceTransformer
 import hdbscan
 from sklearn.decomposition import PCA
@@ -78,27 +78,20 @@ async def upload_cv_for_insights(file: UploadFile = File(...)):
     
     Returns extracted skills from the CV
     """
-    if not file.filename.lower().endswith(('.pdf', '.txt')):
-        raise HTTPException(status_code=400, detail="Only PDF and TXT files are supported")
-    
     # Save uploaded file
     save_folder = Path(settings.UPLOAD_FOLDER)
     save_folder.mkdir(parents=True, exist_ok=True)
-    
-    file_id = str(uuid.uuid4())
-    save_path = save_folder / f"{file_id}_{file.filename}"
+
+    content, safe_name = await validate_pdf_upload(file)
+    save_path = save_folder / safe_name
+    file_id = Path(safe_name).stem
     
     try:
         with open(save_path, "wb") as f:
-            content = await file.read()
             f.write(content)
-        
+
         # Extract text from CV
-        if file.filename.lower().endswith('.pdf'):
-            cv_text = resume_parser.extract_text_from_pdf(save_path)
-        else:
-            with open(save_path, 'r', encoding='utf-8') as f:
-                cv_text = f.read()
+        cv_text = resume_parser.extract_text_from_pdf(save_path)
         
         # Extract skills using AI
         user_cv_skills = ai_service.extract_skills(cv_text)

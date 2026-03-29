@@ -30,4 +30,5 @@ firebase-admin>=6.5.0
 tenacity==8.2.3
 tqdm==4.66.1
 slowapi>=0.1.9
+python-magic-bin>=0.4.14
 
