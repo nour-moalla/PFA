@@ -17,7 +17,7 @@ jobs:
 
     #  Security Scan
     - name: Run Trivy Scan
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@v0.18.0
       with:
         scan-type: fs
 
@@ -27,7 +27,7 @@ jobs:
 
     #  Deploy
    # - name: Deploy to Server
-    #  uses: appleboy/ssh-action@master
+    #  uses: appleboy/ssh-action@v1.0.3
      # with:
       #  host: ${{ secrets.SERVER_IP }}
        # username: root

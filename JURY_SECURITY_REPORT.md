@@ -15,6 +15,10 @@ The implementation covered:
 - Prompt injection resistance for LLM calls
 - File upload hardening with MIME verification and size limits
 - Structured JSON logging for backend observability and incident response
+- Container runtime hardening with non-root users (backend and frontend)
+- Container health monitoring with Docker HEALTHCHECK (backend and frontend)
+- Frontend container startup hardening (fixed invalid CMD script)
+- CI supply-chain hardening (pinned GitHub Actions versions)
 
 ---
 
@@ -30,6 +34,10 @@ Result:
 - Renamed or fake PDF uploads are blocked by content-based MIME checks.
 - Uploaded files are stored with UUID names only (no user-controlled filename usage).
 - Backend runtime events now use structured JSON logs instead of ad-hoc print output.
+- Backend and frontend containers now run as non-root users to reduce blast radius.
+- Backend and frontend images now include Docker HEALTHCHECK for runtime liveness/readiness visibility.
+- Frontend container now starts with a valid runtime command, enabling reliable DAST target availability.
+- GitHub Actions workflow references are pinned to specific versions (no `@master` refs).
 
 ---
 
@@ -182,6 +190,81 @@ Impact:
 
 ---
 
+### I) Containers Running as Root User
+Problem:
+- Docker containers run as root by default.
+- If an attacker gets code execution inside a container, root privileges increase post-exploitation impact.
+
+Fix:
+- Hardened both Dockerfiles to run as dedicated low-privilege users.
+- Backend Dockerfile (Debian-style commands):
+  - created `appgroup` + `appuser`
+  - changed ownership of `/app`
+  - set `USER appuser`
+- Frontend Dockerfile (Alpine-style commands):
+  - created `appgroup` + `appuser`
+  - changed ownership of `/app`
+  - set `USER appuser`
+
+Impact:
+- Containers no longer run as `uid=0` by default.
+- Successful container compromise has reduced privilege and reduced host-risk amplification.
+
+---
+
+### J) No Container Health Probing
+Problem:
+- Without HEALTHCHECK, Docker reports containers as running even if the app process is unhealthy.
+- CI/CD and security stages (such as DAST/ZAP readiness checks) cannot reliably detect service readiness.
+
+Fix:
+- Added HEALTHCHECK to both Dockerfiles before the runtime `USER` line.
+- Backend health probe:
+  - `curl -f http://localhost:8000/health || exit 1`
+- Frontend health probe:
+  - `curl -f http://localhost:3000 || exit 1`
+- Installed `curl` in both images so health probes execute correctly.
+
+Impact:
+- Containers now expose healthy/unhealthy state to Docker.
+- Better deployment safety and deterministic readiness checks for security scanning pipelines.
+
+---
+
+### K) Frontend Container CMD Mismatch (Service Crash on Startup)
+Problem:
+- Frontend Dockerfile used `npm start`, but `package.json` did not define a `start` script.
+- Container exited immediately with missing-script error.
+- DAST stages (e.g., ZAP) require a live target and therefore fail when the frontend never starts.
+
+Fix:
+- Updated frontend Docker CMD to use the existing preview script and explicit host/port binding:
+  - `npm run preview -- --host 0.0.0.0 --port 3000`
+
+Impact:
+- Frontend container starts reliably in Docker.
+- Security testing pipeline can reach the target app endpoint for scanning.
+- Reduced false-negative pipeline failures caused by misconfigured container startup.
+
+---
+
+### L) Unpinned GitHub Actions (`@master`) Supply-Chain Risk
+Problem:
+- Workflow actions referenced `@master`, which tracks mutable branch tip code.
+- A malicious or compromised upstream change could be executed automatically in CI.
+
+Fix:
+- Replaced `@master` refs in workflow with pinned versions:
+  - `aquasecurity/trivy-action@v0.18.0`
+  - `appleboy/ssh-action@v1.0.3`
+- Verified no remaining `@master` usage in workflow files.
+
+Impact:
+- CI pipeline now executes explicitly selected action versions.
+- Reduced supply-chain risk from unreviewed upstream branch changes.
+
+---
+
 ## 4. Files Added / Modified
 
 ### Added
@@ -228,6 +311,15 @@ Impact:
   - Replaced print startup/retry logs with structured logger calls and removed API key logging.
 - `frontend/src/api/client.js`
   - Added Axios interceptor to attach Firebase ID token in `Authorization` header.
+- `backend/Dockerfile`
+  - Added non-root runtime user/group and switched container to `USER appuser`.
+  - Added `curl` and Docker HEALTHCHECK for `/health` endpoint.
+- `frontend/Dockerfile`
+  - Added Alpine-compatible non-root runtime user/group and switched container to `USER appuser`.
+  - Added `curl` and Docker HEALTHCHECK for frontend root endpoint.
+  - Replaced invalid `npm start` CMD with valid preview runtime command.
+- `.github/workflows/deploy.yml`
+  - Replaced unpinned `@master` action refs with pinned stable versions.
 - `backend/requirements.in`
   - Added `firebase-admin>=6.5.0`, `slowapi>=0.1.9`, and `python-magic-bin>=0.4.14`.
 - `backend/requirements.txt`
@@ -253,6 +345,10 @@ Behavior:
 - Git diff confirmed route decorators, ownership checks, limiter wiring, dependency updates, and prompt-injection hardening in AI service.
 - Git diff confirmed secure upload refactor (magic-byte MIME check, size cap, UUID storage names) across all three upload routers.
 - Codebase search confirmed print statements were removed from backend Python modules and replaced with structured logging.
+- Dockerfiles were updated to enforce non-root runtime users for both backend and frontend services.
+- Dockerfiles now include HEALTHCHECK directives and required probe dependencies.
+- Frontend Docker CMD now maps to an existing npm script, preventing startup failure.
+- Workflow search for `@master` now returns zero results.
 
 ---
 
@@ -267,6 +363,10 @@ Security outcomes achieved:
 - Prompt injection mitigation via strict data delimitation and explicit model constraints
 - Stronger file upload security against spoofed extensions and malicious payload delivery
 - Production-grade observability via structured JSON logs
+- Reduced container privilege by default (defense-in-depth at runtime)
+- Better container observability and readiness guarantees via HEALTHCHECK
+- Stable frontend container runtime needed for downstream DAST automation
+- Stronger CI/CD supply-chain integrity via pinned action versions
 - Better production readiness and compliance posture
 
 ---
@@ -281,5 +381,10 @@ Security outcomes achieved:
 7. Rename a `.txt` file to `.pdf` and upload -> rejected with HTTP 400.
 8. Upload a file larger than 5MB -> rejected with HTTP 400.
 9. Start backend and hit endpoints -> logs appear in JSON format with `time`, `level`, and `msg` fields.
+10. Build and run backend container, then run `id` in container -> user is `appuser`, not `uid=0`.
+11. Build and run frontend container, then run `id` in container -> user is `appuser`, not `uid=0`.
+12. Run `docker ps` after compose up -> backend/frontend show status `Up ... (healthy)` once checks pass.
+13. Start frontend container logs -> no `missing script: start` error; app reachable at `http://localhost:3000`.
+14. Run workflow search for `@master` in `.github/workflows/*.yml` -> zero matches.
 
 These scenarios demonstrate that access control and abuse protections are active and effective.
