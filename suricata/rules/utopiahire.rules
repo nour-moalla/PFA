@@ -1,0 +1,19 @@
+# SQL Injection detection
+alert http any any -> any 8000 (msg:"SQL Injection Attempt - UNION"; \
+  content:"UNION SELECT"; nocase; http_uri; sid:1000001; rev:1;)
+
+alert http any any -> any 8000 (msg:"SQL Injection Attempt - DROP"; \
+  content:"DROP TABLE"; nocase; http_client_body; sid:1000002; rev:1;)
+
+# XSS detection
+alert http any any -> any 8000 (msg:"XSS Attempt - Script Tag"; \
+  content:"<script>"; nocase; http_client_body; sid:1000003; rev:1;)
+
+# Directory traversal detection
+alert http any any -> any 8000 (msg:"Directory Traversal Attempt"; \
+  content:"../"; http_uri; sid:1000004; rev:1;)
+
+# Brute force / high request rate detection
+alert http any any -> any 8000 (msg:"Possible Brute Force Attack"; \
+  threshold: type threshold, track by_src, count 20, seconds 10; \
+  sid:1000005; rev:1;)
