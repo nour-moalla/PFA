@@ -1,5 +1,10 @@
 pipeline {
-    agent { label 'docker-host' }
+    agent {
+        docker {
+            image 'python:3.11-slim'  // A Linux image with Python
+            args '-v /var/run/docker.sock:/var/run/docker.sock' // Allow Docker-in-Docker
+        }
+    }
 
 
     environment {
