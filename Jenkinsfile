@@ -85,7 +85,9 @@ pipeline {
         stage('Build Docker Images') {
             steps {
                 echo 'Building application containers...'
-                sh 'docker compose build'
+                sh '''
+                  docker compose build || docker-compose build
+                '''
             }
         }
 
@@ -144,12 +146,12 @@ pipeline {
             steps {
                 echo 'Starting application containers for DAST testing...'
                 sh '''
-                    docker compose up -d
+                    docker compose up -d || docker-compose up -d
                     echo "Waiting 40 seconds for containers to be ready..."
                     sleep 40
-                    curl -f http://host.docker.internal:8000/health || \
+                    curl -f http://localhost:8000/health || \
                     curl -f http://172.17.0.1:8000/health || \
-                    echo "Health check skipped — app may be starting on different network"
+                    echo "Health check skipped"
                 '''
             }
         }
