@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent docker-host
 
     environment {
         SONARQUBE_URL = 'http://sonarqube:9000'
@@ -7,7 +7,7 @@ pipeline {
         REPORT_DIR    = 'security-reports'
     }
 
-    node('docker-host') {
+    stages {
 
         stage('Checkout') {
             steps {
