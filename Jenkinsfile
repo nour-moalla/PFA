@@ -1,5 +1,5 @@
 pipeline {
-    agent {docker-host}
+    agent { label 'docker-host' }
 
 
     environment {
