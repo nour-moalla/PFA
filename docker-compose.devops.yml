@@ -56,7 +56,7 @@ services:
     volumes:
       - ./suricata/rules:/etc/suricata/rules
       - ./suricata/logs:/var/log/suricata
-    command: -i lo --set af-packet.0.interface=lo
+    command: -i lo --set af-packet.0.interface=lo --set default-rule-path=/etc/suricata/rules -S /etc/suricata/rules/utopiahire.rules
     restart: unless-stopped
 
 volumes:

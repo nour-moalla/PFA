@@ -19,6 +19,9 @@ The implementation covered:
 - Container health monitoring with Docker HEALTHCHECK (backend and frontend)
 - Frontend container startup hardening (fixed invalid CMD script)
 - CI supply-chain hardening (pinned GitHub Actions versions)
+- DevSecOps tooling orchestration with dedicated Docker Compose stack
+- Prometheus scrape configuration for backend and CI tooling
+- Suricata IDS integration with custom detection rules
 
 ---
 
@@ -38,6 +41,9 @@ Result:
 - Backend and frontend images now include Docker HEALTHCHECK for runtime liveness/readiness visibility.
 - Frontend container now starts with a valid runtime command, enabling reliable DAST target availability.
 - GitHub Actions workflow references are pinned to specific versions (no `@master` refs).
+- Dedicated DevSecOps services (Jenkins, SonarQube, Prometheus, Grafana) now run in an isolated tooling compose file.
+- Prometheus is configured to scrape backend metrics and Jenkins targets every 15 seconds.
+- Suricata IDS is integrated with custom rules for SQL injection, XSS, directory traversal, and brute-force indicators.
 
 ---
 
@@ -265,6 +271,33 @@ Impact:
 
 ---
 
+### M) Missing Dedicated DevSecOps Infrastructure Orchestration
+Problem:
+- Security and observability tools were not orchestrated in a dedicated stack.
+- Without a separate tooling compose file, app runtime and DevSecOps infrastructure concerns are mixed.
+- Prometheus had no guaranteed scrape configuration file for backend/tool metrics collection.
+
+Fix:
+- Created dedicated infrastructure compose file:
+  - `docker-compose.devops.yml`
+  - services: Jenkins, SonarQube, Prometheus, Grafana, Suricata
+- Added Prometheus configuration file:
+  - `monitoring/prometheus.yml`
+  - scrape interval and evaluation interval set to 15s
+  - scrape targets configured for backend metrics and Jenkins
+- Added Suricata IDS rules file:
+  - `suricata/rules/utopiahire.rules`
+  - signatures for SQLi (`UNION SELECT`, `DROP TABLE`), XSS (`<script>`), directory traversal (`../`), and request-threshold brute-force detection
+- Brought up infrastructure with compose and verified running containers.
+
+Impact:
+- Clean separation between application stack and DevSecOps tooling stack.
+- Repeatable local observability/security lab environment.
+- Prometheus begins collecting configured metrics targets automatically.
+- Suricata provides network-level attack pattern detection as part of the local security stack.
+
+---
+
 ## 4. Files Added / Modified
 
 ### Added
@@ -274,6 +307,12 @@ Impact:
   - Shared SlowAPI limiter instance.
 - `backend/app/core/upload_validation.py`
   - Shared secure upload validator (size + MIME + UUID filename).
+- `docker-compose.devops.yml`
+  - Dedicated DevSecOps tooling stack (Jenkins, SonarQube, Prometheus, Grafana, Suricata).
+- `monitoring/prometheus.yml`
+  - Prometheus scrape configuration for backend and Jenkins targets.
+- `suricata/rules/utopiahire.rules`
+  - Custom IDS rules for web attack pattern detection on backend traffic.
 - `JURY_SECURITY_REPORT.md`
   - This report.
 
@@ -349,6 +388,10 @@ Behavior:
 - Dockerfiles now include HEALTHCHECK directives and required probe dependencies.
 - Frontend Docker CMD now maps to an existing npm script, preventing startup failure.
 - Workflow search for `@master` now returns zero results.
+- DevSecOps compose stack successfully started with all 4 containers running.
+- DevSecOps compose stack successfully started with all 5 containers running (including Suricata).
+- Prometheus configuration file loaded from `monitoring/prometheus.yml`.
+- Suricata container started with mounted rules/logs directories and custom rule file.
 
 ---
 
@@ -367,6 +410,8 @@ Security outcomes achieved:
 - Better container observability and readiness guarantees via HEALTHCHECK
 - Stable frontend container runtime needed for downstream DAST automation
 - Stronger CI/CD supply-chain integrity via pinned action versions
+- Isolated and reproducible DevSecOps infrastructure for scanning and observability
+- Added IDS visibility through Suricata custom detection rules
 - Better production readiness and compliance posture
 
 ---
@@ -386,5 +431,8 @@ Security outcomes achieved:
 12. Run `docker ps` after compose up -> backend/frontend show status `Up ... (healthy)` once checks pass.
 13. Start frontend container logs -> no `missing script: start` error; app reachable at `http://localhost:3000`.
 14. Run workflow search for `@master` in `.github/workflows/*.yml` -> zero matches.
+15. Run `docker compose -f docker-compose.devops.yml up -d` then `docker ps` -> Jenkins, SonarQube, Prometheus, Grafana, and Suricata are up.
+16. Open dashboards: `:8080` Jenkins, `:9000` SonarQube, `:9090` Prometheus, `:3001` Grafana.
+17. Confirm Suricata container is running and rule file exists at `suricata/rules/utopiahire.rules`.
 
 These scenarios demonstrate that access control and abuse protections are active and effective.
