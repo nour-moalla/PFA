@@ -7,7 +7,7 @@ pipeline {
         REPORT_DIR    = 'security-reports'
     }
 
-    stages {
+    node('docker-host') {
 
         stage('Checkout') {
             steps {
