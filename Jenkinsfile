@@ -177,9 +177,11 @@ pipeline {
                     docker compose up -d
                     echo "Waiting 40 seconds for containers to initialize..."
                     sleep 40
-                    curl -f http://localhost:8000/health && \
-                      echo "Health check PASSED" || \
-                      echo "Health check skipped — continuing"
+                    HOST_IP="172.17.0.1"
+                    echo "Testing health at http://$HOST_IP:8000/health"
+                    curl -f --max-time 10 http://$HOST_IP:8000/health && \
+                    echo "Health check PASSED" || \
+                    echo "Health check skipped — continuing pipeline"
                 '''
             }
         }
@@ -188,21 +190,22 @@ pipeline {
             steps {
                 echo 'Running ZAP dynamic attack scan against running app...'
                 sh '''
+                    HOST_IP="172.17.0.1"
+                    echo "ZAP scanning target: http://$HOST_IP:8000"
                     docker run --rm \
-                      --network host \
-                      -v $(pwd)/${REPORT_DIR}:/zap/wrk:rw \
-                      ghcr.io/zaproxy/zaproxy:stable \
-                      zap-baseline.py \
-                      -t http://localhost:8000 \
-                      -r zap-report.html \
-                      -J zap-report.json \
-                      -I || true
+                    -v $(pwd)/${REPORT_DIR}:/zap/wrk:rw \
+                    ghcr.io/zaproxy/zaproxy:stable \
+                    zap-baseline.py \
+                    -t http://$HOST_IP:8000 \
+                    -r zap-report.html \
+                    -J zap-report.json \
+                    -I || true
                 '''
             }
             post {
                 always {
                     archiveArtifacts artifacts: "${REPORT_DIR}/zap-report.html,${REPORT_DIR}/zap-report.json",
-                                     allowEmptyArchive: true
+                                    allowEmptyArchive: true
                 }
             }
         }
@@ -211,37 +214,54 @@ pipeline {
             steps {
                 echo 'Running controlled attack validation tests...'
                 sh '''
+                    HOST_IP="172.17.0.1"
+                    APP_URL="http://$HOST_IP:8000"
+                    echo "Targeting app at: $APP_URL"
+
                     echo "=== SQL Injection Test ===" | tee ${REPORT_DIR}/attack-results.txt
 
                     docker run --rm \
-                      --network host \
-                      python:3.11-slim \
-                      sh -c "pip install sqlmap -q && python -m sqlmap \
-                        -u http://localhost:8000/api/jobs/database-info \
-                        --batch --level=1" 2>&1 \
-                      | tee -a ${REPORT_DIR}/attack-results.txt || true
+                    python:3.11-slim \
+                    sh -c "pip install sqlmap -q 2>/dev/null && \
+                        sqlmap \
+                        -u ${APP_URL}/api/jobs/database-info \
+                        --batch --level=1 --output-dir=/tmp/sqlmap" \
+                    2>&1 | tee -a ${REPORT_DIR}/attack-results.txt || true
 
-                    echo "=== XSS Filename Test ===" | tee -a ${REPORT_DIR}/attack-results.txt
+                    echo "=== XSS Filename Test ===" \
+                    | tee -a ${REPORT_DIR}/attack-results.txt
                     STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                      -X POST http://localhost:8000/api/resume/upload \
-                      -F "file=@README.md;filename=xss_test.pdf") || STATUS="000"
-                    echo "XSS test HTTP status: $STATUS" \
-                      | tee -a ${REPORT_DIR}/attack-results.txt
+                    --max-time 10 \
+                    -X POST ${APP_URL}/api/resume/upload \
+                    -F "file=@README.md;filename=xss_test.pdf") || STATUS="000"
+                    echo "XSS filename test HTTP status: $STATUS" \
+                    | tee -a ${REPORT_DIR}/attack-results.txt
+                    if [ "$STATUS" = "400" ] || [ "$STATUS" = "422" ]; then
+                    echo "RESULT: XSS filename correctly BLOCKED" \
+                        | tee -a ${REPORT_DIR}/attack-results.txt
+                    else
+                    echo "RESULT: App returned $STATUS" \
+                        | tee -a ${REPORT_DIR}/attack-results.txt
+                    fi
 
-                    echo "=== Rate Limit Test ===" | tee -a ${REPORT_DIR}/attack-results.txt
+                    echo "=== Rate Limit Test ===" \
+                    | tee -a ${REPORT_DIR}/attack-results.txt
                     for i in $(seq 1 15); do
-                      curl -s -o /dev/null -w "Request $i: %{http_code}\\n" \
-                        http://localhost:8000/api/resume/analyze || true
-                    done | tee -a ${REPORT_DIR}/attack-results.txt
+                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+                        --max-time 10 \
+                        ${APP_URL}/api/resume/analyze) || STATUS="000"
+                    echo "Request $i: $STATUS" \
+                        | tee -a ${REPORT_DIR}/attack-results.txt
+                    done
 
                     echo "=== Attack simulation complete ===" \
-                      | tee -a ${REPORT_DIR}/attack-results.txt
+                    | tee -a ${REPORT_DIR}/attack-results.txt
                 '''
             }
             post {
                 always {
                     archiveArtifacts artifacts: "${REPORT_DIR}/attack-results.txt",
-                                     allowEmptyArchive: true
+                                    allowEmptyArchive: true
                 }
             }
         }
