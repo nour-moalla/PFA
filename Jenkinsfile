@@ -1,5 +1,6 @@
 pipeline {
-    agent docker-host
+    agent {docker-host}
+
 
     environment {
         SONARQUBE_URL = 'http://sonarqube:9000'
