@@ -81,8 +81,6 @@ app.include_router(
     dependencies=[Depends(get_current_user)],
 )
 
-logger.info("UtopiaHire Career Services API started successfully")
-
 
 @app.get("/", tags=["Health"])
 async def root():
@@ -118,4 +116,3 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Strict-Transport-Security"] = "max-age=63072000"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
-

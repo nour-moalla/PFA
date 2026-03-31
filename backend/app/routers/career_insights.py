@@ -3,7 +3,6 @@ Career Insights Router
 Handles career analysis, skill gap identification, and roadmap generation
 """
 
-import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import FileResponse
 from pathlib import Path
@@ -20,8 +19,6 @@ from app.core.ai_service import ai_service
 from app.core.resume_parser import ResumeParser
 from app.core.config import settings
 from app.core.upload_validation import validate_pdf_upload
-
-logger = logging.getLogger(__name__)
 from sentence_transformers import SentenceTransformer
 import hdbscan
 from sklearn.decomposition import PCA

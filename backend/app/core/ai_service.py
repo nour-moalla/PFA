@@ -3,7 +3,6 @@ Unified AI Service
 Handles all AI/LLM interactions using a single model
 """
 
-import logging
 import os
 import json
 import time

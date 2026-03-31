@@ -3,7 +3,6 @@ Job Matching Router
 Handles CV-to-job matching using semantic search
 """
 
-import logging
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -20,8 +19,6 @@ from app.core.resume_parser import ResumeParser
 from app.core.config import settings
 from app.core.upload_validation import validate_pdf_upload
 # from sentence_transformers import SentenceTransformer, util
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

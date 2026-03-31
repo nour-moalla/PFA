@@ -9,12 +9,8 @@ COPY requirements.txt .
 
 # Install system dependencies for python-magic
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    gcc \
-    g++ \
-    python3-dev \
-    libmagic1 \
     curl \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
