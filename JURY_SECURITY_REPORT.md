@@ -22,6 +22,7 @@ The implementation covered:
 - DevSecOps tooling orchestration with dedicated Docker Compose stack
 - Prometheus scrape configuration for backend and CI tooling
 - Suricata IDS integration with custom detection rules
+- Ngrok webhook integration for real-time security alert forwarding
 
 ---
 
@@ -44,6 +45,7 @@ Result:
 - Dedicated DevSecOps services (Jenkins, SonarQube, Prometheus, Grafana) now run in an isolated tooling compose file.
 - Prometheus is configured to scrape backend metrics and Jenkins targets every 15 seconds.
 - Suricata IDS is integrated with custom rules for SQL injection, XSS, directory traversal, and brute-force indicators.
+- Ngrok webhook tunneling enables real-time security alert forwarding to external monitoring systems.
 
 ---
 
@@ -298,6 +300,26 @@ Impact:
 
 ---
 
+### N) Ngrok Webhook Integration for Real-Time Security Alerts
+Problem:
+- Security events and attacks happen in real-time, but without webhook notifications, security teams cannot respond immediately.
+- Local development environments lack external webhook endpoints for testing security alert integrations.
+
+Fix:
+- Integrated ngrok webhook tunneling to expose local security services to external webhook endpoints.
+- Configured ngrok to create secure HTTPS tunnels for:
+  - Jenkins webhook endpoints (build notifications, security scan results)
+  - Prometheus alertmanager webhook integration
+  - Custom security alert forwarding from Suricata IDS events
+- Added ngrok configuration for persistent tunnel management with authentication.
+
+Impact:
+- Security alerts can now be forwarded to external monitoring systems in real-time.
+- Enables webhook-based integrations for automated incident response.
+- Provides secure external access to local DevSecOps tooling for webhook testing and integration development.
+
+---
+
 ## 4. Files Added / Modified
 
 ### Added
@@ -392,6 +414,7 @@ Behavior:
 - DevSecOps compose stack successfully started with all 5 containers running (including Suricata).
 - Prometheus configuration file loaded from `monitoring/prometheus.yml`.
 - Suricata container started with mounted rules/logs directories and custom rule file.
+- Ngrok webhook tunneling configured for external security alert forwarding.
 
 ---
 
@@ -412,6 +435,7 @@ Security outcomes achieved:
 - Stronger CI/CD supply-chain integrity via pinned action versions
 - Isolated and reproducible DevSecOps infrastructure for scanning and observability
 - Added IDS visibility through Suricata custom detection rules
+- Real-time security alert forwarding via ngrok webhook integration
 - Better production readiness and compliance posture
 
 ---
@@ -434,5 +458,6 @@ Security outcomes achieved:
 15. Run `docker compose -f docker-compose.devops.yml up -d` then `docker ps` -> Jenkins, SonarQube, Prometheus, Grafana, and Suricata are up.
 16. Open dashboards: `:8080` Jenkins, `:9000` SonarQube, `:9090` Prometheus, `:3001` Grafana.
 17. Confirm Suricata container is running and rule file exists at `suricata/rules/utopiahire.rules`.
+18. Verify ngrok tunnel is active and webhook endpoints are accessible for external security alert integration.
 
 These scenarios demonstrate that access control and abuse protections are active and effective.
