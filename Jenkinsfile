@@ -1,7 +1,4 @@
 pipeline {
-    // FIX 1: Use "agent any" instead of agent { docker {...} }
-    // "agent any" means: run on the Jenkins controller itself (no Docker wrapper)
-    // This way Docker commands run directly on the host where Docker IS installed
     agent any
 
     environment {
@@ -20,6 +17,37 @@ pipeline {
             }
         }
 
+        stage('Prepare Environment') {
+            steps {
+                echo 'Creating .env files from Jenkins credentials...'
+                withCredentials([
+                    string(credentialsId: 'AI_API_KEY',                    variable: 'V_AI_API_KEY'),
+                    string(credentialsId: 'AI_BASE_URL',                   variable: 'V_AI_BASE_URL'),
+                    string(credentialsId: 'AI_MODEL',                      variable: 'V_AI_MODEL'),
+                    string(credentialsId: 'VITE_FIREBASE_API_KEY',         variable: 'V_FB_API_KEY'),
+                    string(credentialsId: 'VITE_FIREBASE_AUTH_DOMAIN',     variable: 'V_FB_AUTH'),
+                    string(credentialsId: 'VITE_FIREBASE_PROJECT_ID',      variable: 'V_FB_PROJECT'),
+                    string(credentialsId: 'VITE_FIREBASE_STORAGE_BUCKET',  variable: 'V_FB_BUCKET'),
+                    string(credentialsId: 'VITE_FIREBASE_MESSAGING_SENDER_ID', variable: 'V_FB_SENDER'),
+                    string(credentialsId: 'VITE_FIREBASE_APP_ID',          variable: 'V_FB_APP_ID')
+                ]) {
+                    sh '''
+                        printf "AI_API_KEY=%s\nAI_BASE_URL=%s\nAI_MODEL=%s\n" \
+                        "$V_AI_API_KEY" "$V_AI_BASE_URL" "$V_AI_MODEL" \
+                        > backend/.env
+
+                        printf "VITE_FIREBASE_API_KEY=%s\nVITE_FIREBASE_AUTH_DOMAIN=%s\nVITE_FIREBASE_PROJECT_ID=%s\nVITE_FIREBASE_STORAGE_BUCKET=%s\nVITE_FIREBASE_MESSAGING_SENDER_ID=%s\nVITE_FIREBASE_APP_ID=%s\n" \
+                        "$V_FB_API_KEY" "$V_FB_AUTH" "$V_FB_PROJECT" \
+                        "$V_FB_BUCKET" "$V_FB_SENDER" "$V_FB_APP_ID" \
+                        > frontend/.env
+
+                        echo "backend/.env created with 3 variables"
+                        echo "frontend/.env created with 6 variables"
+                        echo "AI_MODEL = $V_AI_MODEL"
+                    '''
+                }
+            }
+        }
         stage('Secrets Scan — Gitleaks') {
             steps {
                 echo 'Scanning for leaked API keys and credentials...'
@@ -62,14 +90,16 @@ pipeline {
                     docker run --rm \
                       -v $(pwd)/backend:/app \
                       python:3.11-slim \
-                      sh -c "pip install pip-audit -q && cd /app && pip-audit -r requirements.txt --format json -o /app/pip-audit.json || true"
+                      sh -c "pip install pip-audit -q && pip-audit -r /app/requirements.txt \
+                        --format json -o /app/pip-audit.json || true"
 
                     cp backend/pip-audit.json ${REPORT_DIR}/pip-audit.json || true
 
                     docker run --rm \
                       -v $(pwd)/frontend:/app \
                       node:20-alpine \
-                      sh -c "cd /app && npm audit --json > /app/npm-audit.json 2>&1 || true"
+                      sh -c "cd /app && npm install --prefer-offline -q && \
+                        npm audit --json > /app/npm-audit.json 2>&1 || true"
 
                     cp frontend/npm-audit.json ${REPORT_DIR}/npm-audit.json || true
                 '''
@@ -84,10 +114,8 @@ pipeline {
 
         stage('Build Docker Images') {
             steps {
-                echo 'Building application containers...'
-                sh '''
-                  docker compose build || docker-compose build
-                '''
+                echo 'Building application Docker images...'
+                sh 'docker compose build'
             }
         }
 
@@ -146,12 +174,12 @@ pipeline {
             steps {
                 echo 'Starting application containers for DAST testing...'
                 sh '''
-                    docker compose up -d || docker-compose up -d
-                    echo "Waiting 40 seconds for containers to be ready..."
+                    docker compose up -d
+                    echo "Waiting 40 seconds for containers to initialize..."
                     sleep 40
-                    curl -f http://localhost:8000/health || \
-                    curl -f http://172.17.0.1:8000/health || \
-                    echo "Health check skipped"
+                    curl -f http://localhost:8000/health && \
+                      echo "Health check PASSED" || \
+                      echo "Health check skipped — continuing"
                 '''
             }
         }
@@ -190,14 +218,14 @@ pipeline {
                       python:3.11-slim \
                       sh -c "pip install sqlmap -q && python -m sqlmap \
                         -u http://localhost:8000/api/jobs/database-info \
-                        --batch --level=1 --output-dir=/tmp/sqlmap" 2>&1 \
+                        --batch --level=1" 2>&1 \
                       | tee -a ${REPORT_DIR}/attack-results.txt || true
 
                     echo "=== XSS Filename Test ===" | tee -a ${REPORT_DIR}/attack-results.txt
                     STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
                       -X POST http://localhost:8000/api/resume/upload \
                       -F "file=@README.md;filename=xss_test.pdf") || STATUS="000"
-                    echo "XSS filename test HTTP status: $STATUS" \
+                    echo "XSS test HTTP status: $STATUS" \
                       | tee -a ${REPORT_DIR}/attack-results.txt
 
                     echo "=== Rate Limit Test ===" | tee -a ${REPORT_DIR}/attack-results.txt
@@ -222,22 +250,21 @@ pipeline {
             steps {
                 echo 'Confirming local deployment is running...'
                 sh '''
-                    docker ps --filter "name=utopiahire" --format "table {{.Names}}\t{{.Status}}"
+                    docker ps --filter "name=utopiahire" \
+                      --format "table {{.Names}}\t{{.Status}}"
                     echo "Local deployment confirmed"
                 '''
             }
         }
     }
 
-    // FIX 2: Wrap the post block sh commands inside a node block
-    // This provides the FilePath context that sh needs
     post {
         always {
             node('built-in') {
-                echo 'Bundling all security reports into one artifact...'
+                echo 'Bundling all security reports...'
                 sh '''
-                    mkdir -p ${REPORT_DIR}
-                    cd ${REPORT_DIR}
+                    mkdir -p security-reports
+                    cd security-reports
                     zip -r ../security-report-bundle.zip . 2>/dev/null || true
                 '''
                 archiveArtifacts artifacts: 'security-report-bundle.zip',
