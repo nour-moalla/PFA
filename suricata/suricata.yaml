@@ -1,0 +1,27 @@
+%YAML 1.1
+---
+
+vars:
+  address-groups:
+    HOME_NET: "[172.17.0.0/16]"
+    EXTERNAL_NET: "!$HOME_NET"
+
+default-rule-path: /var/lib/suricata/rules
+
+rule-files:
+  - utopiahire.rules
+
+af-packet:
+  - interface: eth0
+
+outputs:
+  - fast:
+      enabled: yes
+      filename: fast.log
+      append: yes
+
+logging:
+  default-log-level: info
+
+detect:
+  profile: medium
