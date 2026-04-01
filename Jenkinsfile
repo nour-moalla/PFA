@@ -214,45 +214,45 @@ pipeline {
             steps {
                 echo 'Running controlled attack validation tests...'
                 sh '''
-                    HOST_IP="172.17.0.1"
-                    APP_URL="http://$HOST_IP:8000"
-                    echo "Targeting app at: $APP_URL"
+                    echo "=== DEBUG: Checking app ==="
+                    docker ps
+
+                    echo "Waiting for backend to be ready..."
+                    for i in $(seq 1 20); do
+                    if curl -s http://localhost:8000/health > /dev/null; then
+                        echo "Backend is UP"
+                        break
+                    fi
+                    echo "Waiting..."
+                    sleep 5
+                    done
 
                     echo "=== SQL Injection Test ===" | tee ${REPORT_DIR}/attack-results.txt
 
-                    docker run --rm \
-                    python:3.11-slim \
-                    sh -c "pip install sqlmap -q 2>/dev/null && \
-                        sqlmap \
-                        -u ${APP_URL}/api/jobs/database-info \
-                        --batch --level=1 --output-dir=/tmp/sqlmap" \
-                    2>&1 | tee -a ${REPORT_DIR}/attack-results.txt || true
+                    docker run --rm --network host python:3.11-slim bash -c "
+                        pip install sqlmap >/dev/null 2>&1 &&
+                        sqlmap -u 'http://localhost:8000/api/jobs/database-info' \
+                            --batch --level=1
+                    " 2>&1 | tee -a ${REPORT_DIR}/attack-results.txt
 
-                    echo "=== XSS Filename Test ===" \
-                    | tee -a ${REPORT_DIR}/attack-results.txt
+
+                    echo "=== XSS Filename Test ===" | tee -a ${REPORT_DIR}/attack-results.txt
+
                     STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                    --max-time 10 \
-                    -X POST ${APP_URL}/api/resume/upload \
-                    -F "file=@README.md;filename=xss_test.pdf") || STATUS="000"
-                    echo "XSS filename test HTTP status: $STATUS" \
-                    | tee -a ${REPORT_DIR}/attack-results.txt
-                    if [ "$STATUS" = "400" ] || [ "$STATUS" = "422" ]; then
-                    echo "RESULT: XSS filename correctly BLOCKED" \
-                        | tee -a ${REPORT_DIR}/attack-results.txt
-                    else
-                    echo "RESULT: App returned $STATUS" \
-                        | tee -a ${REPORT_DIR}/attack-results.txt
-                    fi
+                    -X POST http://localhost:8000/api/resume/upload \
+                    -F "file=@/etc/hosts;filename=<script>alert(1)</script>.pdf")
 
-                    echo "=== Rate Limit Test ===" \
+                    echo "XSS filename HTTP status: $STATUS" \
                     | tee -a ${REPORT_DIR}/attack-results.txt
+
+
+                    echo "=== Rate Limit Test ===" | tee -a ${REPORT_DIR}/attack-results.txt
+
                     for i in $(seq 1 15); do
-                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                        --max-time 10 \
-                        ${APP_URL}/api/resume/analyze) || STATUS="000"
-                    echo "Request $i: $STATUS" \
-                        | tee -a ${REPORT_DIR}/attack-results.txt
-                    done
+                    curl -s -o /dev/null -w "Request $i: %{http_code}\\n" \
+                        http://localhost:8000/api/resume/analyze
+                    done | tee -a ${REPORT_DIR}/attack-results.txt
+
 
                     echo "=== Attack simulation complete ===" \
                     | tee -a ${REPORT_DIR}/attack-results.txt
