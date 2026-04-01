@@ -20,7 +20,6 @@ from app.core.resume_parser import ResumeParser
 from app.core.config import settings
 from app.core.upload_validation import validate_pdf_upload
 from sentence_transformers import SentenceTransformer
-import hdbscan
 from sklearn.decomposition import PCA
 
 router = APIRouter()
@@ -211,7 +210,7 @@ async def cluster_skills(data: Dict):
         skill_embeddings = np.array([model.encode(skill) for skill in unique_skills])
         
         # Cluster with HDBSCAN
-        clusterer = hdbscan.HDBSCAN(
+        clusterer = HDBSCAN(
             min_cluster_size=max(2, len(unique_skills) // 10),
             min_samples=1,
             metric='euclidean',
