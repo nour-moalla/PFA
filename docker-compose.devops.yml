@@ -59,6 +59,19 @@ services:
     command: -i lo --set af-packet.0.interface=lo --set default-rule-path=/etc/suricata/rules -S /etc/suricata/rules/utopiahire.rules
     restart: unless-stopped
 
+  dashboard:
+    build: ./dashboard
+    container_name: utopiahire-dashboard
+    ports:
+      - "8501:8501"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./security-reports:/app/security-reports
+      - ./suricata/logs:/app/suricata/logs
+    environment:
+      - OPENAI_API_KEY=${AI_API_KEY}
+    restart: unless-stopped
+
 volumes:
   jenkins_data:
   sonar_data:
