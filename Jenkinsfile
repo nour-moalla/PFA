@@ -172,20 +172,22 @@ pipeline {
 
         stage('Start Local Staging') {
             steps {
-                echo 'Starting application containers for DAST testing...'
+                echo 'Starting application containers for DAST and attack testing...'
                 sh '''
-                    docker compose up -d
-                    echo "Waiting 40 seconds for containers to initialize..."
-                    sleep 40
-                    HOST_IP="172.17.0.1"
-                    echo "Testing health at http://$HOST_IP:8000/health"
-                    curl -f --max-time 10 http://$HOST_IP:8000/health && \
-                    echo "Health check PASSED" || \
-                    echo "Health check skipped — continuing pipeline"
+                    echo "Cleaning old containers..."
+                    docker compose down || true
+
+                    echo "Starting fresh containers..."
+                    docker compose up -d --build
+
+                    echo "Waiting for backend..."
+                    sleep 20
+
+                    curl -f http://localhost:8000/health || exit 1
+                    echo "Backend is healthy and ready"
                 '''
             }
         }
-
         stage('DAST — OWASP ZAP') {
             steps {
                 echo 'Running ZAP dynamic attack scan against running app...'
