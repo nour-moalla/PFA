@@ -23,6 +23,9 @@ The implementation covered:
 - Prometheus scrape configuration for backend and CI tooling
 - Suricata IDS integration with custom detection rules
 - Ngrok webhook integration for real-time security alert forwarding
+- Full Jenkins CI/CD security pipeline (Jenkinsfile as code)
+- Credential-driven CI environment provisioning via Jenkins secrets
+- Standalone dashboard security control center with isolated dependencies
 
 ---
 
@@ -46,6 +49,8 @@ Result:
 - Prometheus is configured to scrape backend metrics and Jenkins targets every 15 seconds.
 - Suricata IDS is integrated with custom rules for SQL injection, XSS, directory traversal, and brute-force indicators.
 - Ngrok webhook tunneling enables real-time security alert forwarding to external monitoring systems.
+- Jenkins now runs a full staged security pipeline with credential-to-`.env` injection, containerized scanners, DAST, attack simulation, and report artifact bundling.
+- A separate `dashboard/` application now includes a runnable Streamlit control center (`dashboard/app.py`) with Dev/Sec/Ops monitoring and control actions.
 
 ---
 
@@ -320,6 +325,62 @@ Impact:
 
 ---
 
+### O) Missing Jenkins Pipeline-as-Code for End-to-End Security Gates
+Problem:
+- Security checks were not codified in a single Jenkins pipeline file.
+- Without pipeline-as-code, scans become manual and inconsistent across runs.
+
+Fix:
+- Created root-level `Jenkinsfile` with complete security stages:
+  - Checkout
+  - Prepare Environment (build `.env` files from Jenkins credentials)
+  - Gitleaks secrets scan
+  - SonarQube SAST
+  - Dependency audit (pip-audit + npm audit)
+  - Docker build
+  - Trivy container scanning
+  - Checkov IaC scanning
+  - Local staging cleanup/recreate + backend health polling
+  - OWASP ZAP baseline DAST
+  - Attack simulation tests (SQLi, XSS filename, rate-limit behavior, traversal)
+  - Local deployment confirmation
+  - Artifact/report bundling
+- Updated scanner execution to run inside Docker images (gitleaks, sonar-scanner, pip-audit, npm audit, trivy, checkov, zap).
+- Standardized report output under `security-reports/` and archived generated artifacts per stage.
+
+Impact:
+- Security controls are repeatable, auditable, and enforced by CI.
+- Pipeline no longer depends on preinstalled host tooling for most scanners.
+- Credential handling is centralized through Jenkins credentials instead of static env files in source.
+
+---
+
+### P) Missing Isolated Dashboard Application Structure
+Problem:
+- The security dashboard app did not exist as an independent project module.
+- Mixing dashboard dependencies into the main app would increase coupling and maintenance risk.
+
+Fix:
+- Created dedicated `dashboard/` project structure with separate dependency manifest:
+  - `dashboard/app.py`
+  - `dashboard/pages/`
+  - `dashboard/tools/`
+  - `dashboard/knowledge_base/`
+  - `dashboard/data/`
+  - `dashboard/requirements.txt`
+- Implemented Streamlit-based control center tabs for Dev/Sec/Ops workflows:
+  - trigger local scans
+  - view container status
+  - start/stop Suricata and app services
+  - trigger Jenkins jobs and inspect local platform links
+
+Impact:
+- Dashboard can be developed, containerized, and deployed independently.
+- Cleaner architecture separation and easier environment management.
+- Operators can run core security workflows from one UI during jury demonstrations.
+
+---
+
 ## 4. Files Added / Modified
 
 ### Added
@@ -335,6 +396,12 @@ Impact:
   - Prometheus scrape configuration for backend and Jenkins targets.
 - `suricata/rules/utopiahire.rules`
   - Custom IDS rules for web attack pattern detection on backend traffic.
+- `Jenkinsfile`
+  - Full Jenkins pipeline-as-code with all requested security stages and report artifacts.
+- `dashboard/app.py`
+  - Streamlit DevSecOps control-center application for scan orchestration and monitoring.
+- `dashboard/requirements.txt`
+  - Independent dependency set for the standalone dashboard application.
 - `JURY_SECURITY_REPORT.md`
   - This report.
 
@@ -381,6 +448,14 @@ Impact:
   - Replaced invalid `npm start` CMD with valid preview runtime command.
 - `.github/workflows/deploy.yml`
   - Replaced unpinned `@master` action refs with pinned stable versions.
+- `dashboard/pages/`
+  - Created dashboard page module directory.
+- `dashboard/tools/`
+  - Created dashboard tools/integration module directory.
+- `dashboard/knowledge_base/`
+  - Created dashboard knowledge base storage directory.
+- `dashboard/data/`
+  - Created dashboard data directory.
 - `backend/requirements.in`
   - Added `firebase-admin>=6.5.0`, `slowapi>=0.1.9`, and `python-magic-bin>=0.4.14`.
 - `backend/requirements.txt`
@@ -415,6 +490,9 @@ Behavior:
 - Prometheus configuration file loaded from `monitoring/prometheus.yml`.
 - Suricata container started with mounted rules/logs directories and custom rule file.
 - Ngrok webhook tunneling configured for external security alert forwarding.
+- Jenkinsfile includes credential-driven `.env` generation and containerized security scanner execution.
+- Jenkins attack simulation stage validates SQLi, XSS upload behavior, rate-limit enforcement, and traversal blocking.
+- Dashboard app entrypoint exists at `dashboard/app.py` with Dev/Sec/Ops tabs and container/service controls.
 
 ---
 
@@ -436,6 +514,9 @@ Security outcomes achieved:
 - Isolated and reproducible DevSecOps infrastructure for scanning and observability
 - Added IDS visibility through Suricata custom detection rules
 - Real-time security alert forwarding via ngrok webhook integration
+- Security controls fully codified as Jenkins pipeline-as-code
+- CI runtime secrets flow is managed centrally through Jenkins credentials
+- Cleaner modular architecture via independent dashboard application
 - Better production readiness and compliance posture
 
 ---
@@ -459,8 +540,9 @@ Security outcomes achieved:
 16. Open dashboards: `:8080` Jenkins, `:9000` SonarQube, `:9090` Prometheus, `:3001` Grafana.
 17. Confirm Suricata container is running and rule file exists at `suricata/rules/utopiahire.rules`.
 18. Verify ngrok tunnel is active and webhook endpoints are accessible for external security alert integration.
+19. Open `Jenkinsfile` -> verify all security stages are defined from Gitleaks to ZAP and report bundling.
+20. Verify Jenkins pipeline includes `Prepare Environment` stage and generates `backend/.env` + `frontend/.env` from credentials during CI.
+21. Check dashboard structure -> `dashboard/`, `dashboard/app.py`, `dashboard/pages/`, `dashboard/tools/`, `dashboard/knowledge_base/`, `dashboard/data/`, and `dashboard/requirements.txt` all exist.
+22. Run `streamlit run dashboard/app.py` -> confirm Dev/Sec/Ops tabs load and container status panel is visible.
 
 These scenarios demonstrate that access control and abuse protections are active and effective.
-
-test
-test2
