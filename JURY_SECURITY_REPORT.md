@@ -26,6 +26,7 @@ The implementation covered:
 - Full Jenkins CI/CD security pipeline (Jenkinsfile as code)
 - Credential-driven CI environment provisioning via Jenkins secrets
 - Standalone dashboard security control center with isolated dependencies
+- Dashboard containerization inside DevSecOps Docker Compose stack
 
 ---
 
@@ -51,6 +52,7 @@ Result:
 - Ngrok webhook tunneling enables real-time security alert forwarding to external monitoring systems.
 - Jenkins now runs a full staged security pipeline with credential-to-`.env` injection, containerized scanners, DAST, attack simulation, and report artifact bundling.
 - A separate `dashboard/` application now includes a runnable Streamlit control center (`dashboard/app.py`) with Dev/Sec/Ops monitoring and control actions.
+- Dashboard now runs as a dedicated Docker service (`utopiahire-dashboard`) in the DevSecOps stack and starts automatically with tooling services.
 
 ---
 
@@ -363,6 +365,7 @@ Problem:
 Fix:
 - Created dedicated `dashboard/` project structure with separate dependency manifest:
   - `dashboard/app.py`
+  - `dashboard/Dockerfile`
   - `dashboard/pages/`
   - `dashboard/tools/`
   - `dashboard/knowledge_base/`
@@ -373,11 +376,18 @@ Fix:
   - view container status
   - start/stop Suricata and app services
   - trigger Jenkins jobs and inspect local platform links
+- Added dashboard service to `docker-compose.devops.yml`:
+  - build context: `./dashboard`
+  - container name: `utopiahire-dashboard`
+  - published port: `8501:8501`
+  - mounted data: Docker socket, security reports, Suricata logs
+  - restart policy: `unless-stopped`
 
 Impact:
 - Dashboard can be developed, containerized, and deployed independently.
 - Cleaner architecture separation and easier environment management.
 - Operators can run core security workflows from one UI during jury demonstrations.
+- The dashboard now boots consistently with the rest of the DevSecOps stack across environments.
 
 ---
 
@@ -400,6 +410,8 @@ Impact:
   - Full Jenkins pipeline-as-code with all requested security stages and report artifacts.
 - `dashboard/app.py`
   - Streamlit DevSecOps control-center application for scan orchestration and monitoring.
+- `dashboard/Dockerfile`
+  - Container image recipe for running the Streamlit dashboard on port 8501.
 - `dashboard/requirements.txt`
   - Independent dependency set for the standalone dashboard application.
 - `JURY_SECURITY_REPORT.md`
@@ -446,6 +458,8 @@ Impact:
   - Added Alpine-compatible non-root runtime user/group and switched container to `USER appuser`.
   - Added `curl` and Docker HEALTHCHECK for frontend root endpoint.
   - Replaced invalid `npm start` CMD with valid preview runtime command.
+- `docker-compose.devops.yml`
+  - Added `dashboard` service (`utopiahire-dashboard`) with build, port mapping, mounts, env var wiring, and restart policy.
 - `.github/workflows/deploy.yml`
   - Replaced unpinned `@master` action refs with pinned stable versions.
 - `dashboard/pages/`
@@ -493,6 +507,8 @@ Behavior:
 - Jenkinsfile includes credential-driven `.env` generation and containerized security scanner execution.
 - Jenkins attack simulation stage validates SQLi, XSS upload behavior, rate-limit enforcement, and traversal blocking.
 - Dashboard app entrypoint exists at `dashboard/app.py` with Dev/Sec/Ops tabs and container/service controls.
+- Dashboard Dockerfile exists and exposes Streamlit on port 8501 with headless bind to `0.0.0.0`.
+- DevSecOps compose file includes a `dashboard` service that starts with tooling stack and maps host port `8501`.
 
 ---
 
@@ -517,6 +533,7 @@ Security outcomes achieved:
 - Security controls fully codified as Jenkins pipeline-as-code
 - CI runtime secrets flow is managed centrally through Jenkins credentials
 - Cleaner modular architecture via independent dashboard application
+- Full DevSecOps observability/security UI is containerized and reproducible
 - Better production readiness and compliance posture
 
 ---
@@ -544,5 +561,9 @@ Security outcomes achieved:
 20. Verify Jenkins pipeline includes `Prepare Environment` stage and generates `backend/.env` + `frontend/.env` from credentials during CI.
 21. Check dashboard structure -> `dashboard/`, `dashboard/app.py`, `dashboard/pages/`, `dashboard/tools/`, `dashboard/knowledge_base/`, `dashboard/data/`, and `dashboard/requirements.txt` all exist.
 22. Run `streamlit run dashboard/app.py` -> confirm Dev/Sec/Ops tabs load and container status panel is visible.
+23. Open `dashboard/Dockerfile` -> verify Streamlit CMD binds to `0.0.0.0:8501` in headless mode.
+24. Run `docker compose -f docker-compose.devops.yml up -d dashboard` -> confirm `utopiahire-dashboard` is running and reachable at `http://localhost:8501`.
 
 These scenarios demonstrate that access control and abuse protections are active and effective.
+
+test
