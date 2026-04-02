@@ -1,0 +1,7 @@
+# Create frontend/.dockerignore
+@"
+node_modules
+.git
+.env
+dist
+"@ | Out-File -FilePath frontend\.dockerignore -Encoding utf8

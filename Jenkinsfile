@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         SONARQUBE_URL = 'http://sonarqube:9000'
-        APP_BACKEND   = 'http://localhost:8000'
+        APP_BACKEND   = 'http://utopiahire-backend:8000'
         REPORT_DIR    = 'security-reports'
     }
 
@@ -174,8 +174,6 @@ pipeline {
             steps {
                 echo 'Cleaning up any existing containers...'
                 sh '''
-                    HOST_IP="172.17.0.1"
-
                     docker rm -f utopiahire-backend  2>/dev/null || true
                     docker rm -f utopiahire-frontend 2>/dev/null || true
                     docker compose down --remove-orphans 2>/dev/null || true
@@ -187,7 +185,7 @@ pipeline {
                     for i in $(seq 1 20); do
                         STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
                         --max-time 5 \
-                        http://$HOST_IP:8000/health) || STATUS="000"
+                        http://utopiahire-backend:8000/health) || STATUS="000"
                         echo "Attempt $i: HTTP $STATUS"
                         if [ "$STATUS" = "200" ]; then
                             echo "Backend is healthy and ready"
@@ -198,21 +196,20 @@ pipeline {
                 '''
             }
         }
-
         stage('DAST — OWASP ZAP') {
             steps {
                 echo 'Running ZAP dynamic attack scan against running app...'
                 sh '''
-                    HOST_IP="172.17.0.1"
-                    echo "ZAP scanning target: http://$HOST_IP:8000"
+                    echo "ZAP scanning target: http://utopiahire-backend:8000"
                     docker run --rm \
-                    -v $(pwd)/${REPORT_DIR}:/zap/wrk:rw \
-                    ghcr.io/zaproxy/zaproxy:stable \
-                    zap-baseline.py \
-                    -t http://$HOST_IP:8000 \
-                    -r zap-report.html \
-                    -J zap-report.json \
-                    -I || true
+                        --network utopiahire-pipeline_default \
+                        -v $(pwd)/${REPORT_DIR}:/zap/wrk:rw \
+                        ghcr.io/zaproxy/zaproxy:stable \
+                        zap-baseline.py \
+                        -t http://utopiahire-backend:8000 \
+                        -r zap-report.html \
+                        -J zap-report.json \
+                        -I || true
                 '''
             }
             post {
@@ -227,10 +224,8 @@ pipeline {
             steps {
                 echo 'Running controlled attack validation tests...'
                 sh '''
-                    HOST_IP="172.17.0.1"
-                    APP_URL="http://$HOST_IP:8000"
-                    echo "Target app: $APP_URL"
-
+                    APP_URL="http://utopiahire-backend:8000"
+                    echo "Target: $APP_URL"
                     mkdir -p security-reports
 
                     echo "=== SQL Injection Test ===" | tee security-reports/attack-results.txt

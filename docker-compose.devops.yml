@@ -3,18 +3,18 @@ version: '3.8'
 services:
 
   jenkins:
-    image: jenkins/jenkins:lts
-    container_name: jenkins
-    ports:
-      - "8080:8080"
-      - "50000:50000"
-    volumes:
-      - jenkins_data:/var/jenkins_home
-      - /var/run/docker.sock:/var/run/docker.sock   # ADD THIS
-      - /usr/bin/docker:/usr/bin/docker             # ADD THIS
-    group_add:
-      - "999"   # docker group — allows jenkins user to use the socket
-    restart: unless-stopped
+      image: jenkins/jenkins:lts
+      container_name: jenkins
+      ports:
+        - "8080:8080"
+        - "50000:50000"
+      volumes:
+        - jenkins_data:/var/jenkins_home
+        - /var/run/docker.sock:/var/run/docker.sock
+      networks:
+        - default
+        - app_network
+      restart: unless-stopped
 
   sonarqube:
     image: sonarqube:community
@@ -81,3 +81,9 @@ volumes:
   sonar_data:
   sonar_logs:
   grafana_data:
+
+networks:
+  default:
+  app_network:
+  external: true
+  name: utopiahire-main_default
