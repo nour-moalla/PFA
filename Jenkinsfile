@@ -12,11 +12,8 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo 'Pulling latest code from GitHub...'
-                sh '''
-                    rm -rf *
-                    git config --global --add safe.directory $(pwd)
-                    mkdir -p ${REPORT_DIR}
-                '''
+                checkout scm
+                sh 'mkdir -p ${REPORT_DIR}'
             }
         }
 
