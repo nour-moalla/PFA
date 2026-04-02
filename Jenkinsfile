@@ -12,15 +12,9 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo 'Pulling latest code from GitHub...'
-                deleteDir() // wipe workspace before checkout
-                checkout([
-                    $class: 'GitSCM',
-                    branches: [[name: '*/main']],
-                    doGenerateSubmoduleConfigurations: false,
-                    extensions: [[$class: 'CleanBeforeCheckout']],
-                    userRemoteConfigs: [[url: 'https://github.com/nour-moalla/PFA.git']]
-                ])
                 sh '''
+                    rm -rf *
+                    git clone https://github.com/nour-moalla/PFA.git .
                     git config --global --add safe.directory $(pwd)
                     mkdir -p ${REPORT_DIR}
                 '''
