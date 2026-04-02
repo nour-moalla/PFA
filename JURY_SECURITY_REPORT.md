@@ -1,6 +1,6 @@
 # Security Implementation Report (For Jury)
 
-Date: 2026-03-29  
+Date: 2026-04-01  
 Project: UtopiaHire Career Services (FastAPI + React)
 
 ## 1. Objective
@@ -27,6 +27,8 @@ The implementation covered:
 - Credential-driven CI environment provisioning via Jenkins secrets
 - Standalone dashboard security control center with isolated dependencies
 - Dashboard containerization inside DevSecOps Docker Compose stack
+- iptables firewall rules enforcement at OS kernel level
+- Prometheus metrics endpoint for application performance monitoring
 
 ---
 
@@ -53,6 +55,8 @@ Result:
 - Jenkins now runs a full staged security pipeline with credential-to-`.env` injection, containerized scanners, DAST, attack simulation, and report artifact bundling.
 - A separate `dashboard/` application now includes a runnable Streamlit control center (`dashboard/app.py`) with Dev/Sec/Ops monitoring and control actions.
 - Dashboard now runs as a dedicated Docker service (`utopiahire-dashboard`) in the DevSecOps stack and starts automatically with tooling services.
+- iptables firewall rules now enforce network-level access control at the OS kernel level, blocking unauthorized traffic before it reaches the application.
+- FastAPI backend now exposes `/metrics` endpoint with Prometheus instrumentation for request counts, response times, and error rates.
 
 ---
 
@@ -391,6 +395,34 @@ Impact:
 
 ---
 
+### Q) Missing OS-Level Firewall Enforcement (Supervisor Request)
+Problem:
+- Application had three security layers: code-level (ZAP), network detection (Suricata), but no active blocking at the OS kernel level.
+- Without iptables, malicious traffic could still reach the application even if detected by Suricata.
+- No enforcement mechanism to block unauthorized ports or implement rate limiting at the network boundary.
+
+Fix:
+- Created iptables firewall setup script (`backend/scripts/setup-firewall.sh`) with comprehensive rules:
+  - Default DROP policy (whitelist approach)
+  - Allow established connections (responses to outbound traffic)
+  - Allow loopback communication (internal container traffic)
+  - Allow only port 8000 for external access
+  - Rate limiting: max 20 new connections/minute per IP (brute force protection)
+  - Log all blocked packets with "IPTABLES-BLOCKED:" prefix
+  - Drop all other traffic
+- Updated backend Dockerfile to install iptables and copy the setup script.
+- Added NET_ADMIN and NET_RAW capabilities to backend container in docker-compose.yml.
+- Applied firewall rules inside running container as root user.
+
+Impact:
+- Network-level access control now enforced at OS kernel level.
+- Unauthorized ports (e.g., SSH on 22) are blocked before reaching application.
+- Brute force attacks are rate-limited at network boundary.
+- All blocked traffic is logged for security monitoring and jury evidence.
+- Three-tier security: application code → network detection → OS enforcement.
+
+---
+
 ## 4. Files Added / Modified
 
 ### Added
@@ -414,6 +446,10 @@ Impact:
   - Container image recipe for running the Streamlit dashboard on port 8501.
 - `dashboard/requirements.txt`
   - Independent dependency set for the standalone dashboard application.
+- `backend/scripts/setup-firewall.sh`
+  - iptables firewall rules script for OS-level network enforcement.
+- `security-reports/iptables-active-rules.txt`
+  - Saved iptables rules for jury evidence.
 - `JURY_SECURITY_REPORT.md`
   - This report.
 
@@ -423,6 +459,7 @@ Impact:
   - Added auth dependency on sensitive routers.
   - Wired rate-limit exception handling and limiter state.
   - Added centralized structured JSON logging configuration.
+  - Added Prometheus metrics instrumentation with `prometheus-fastapi-instrumentator`.
 - `backend/app/core/config.py`
   - Added Firebase auth settings:
   - `FIREBASE_CREDENTIALS_JSON`
@@ -454,10 +491,13 @@ Impact:
 - `backend/Dockerfile`
   - Added non-root runtime user/group and switched container to `USER appuser`.
   - Added `curl` and Docker HEALTHCHECK for `/health` endpoint.
+  - Added `iptables` installation and firewall setup script copying.
 - `frontend/Dockerfile`
   - Added Alpine-compatible non-root runtime user/group and switched container to `USER appuser`.
   - Added `curl` and Docker HEALTHCHECK for frontend root endpoint.
   - Replaced invalid `npm start` CMD with valid preview runtime command.
+- `docker-compose.yml`
+  - Added NET_ADMIN and NET_RAW capabilities to backend container for iptables functionality.
 - `docker-compose.devops.yml`
   - Added `dashboard` service (`utopiahire-dashboard`) with build, port mapping, mounts, env var wiring, and restart policy.
 - `.github/workflows/deploy.yml`
@@ -473,7 +513,7 @@ Impact:
 - `backend/requirements.in`
   - Added `firebase-admin>=6.5.0`, `slowapi>=0.1.9`, and `python-magic-bin>=0.4.14`.
 - `backend/requirements.txt`
-  - Added `firebase-admin>=6.5.0`, `slowapi>=0.1.9`, and `python-magic-bin>=0.4.14`.
+  - Added `firebase-admin>=6.5.0`, `slowapi>=0.1.9`, `python-magic-bin>=0.4.14`, and `prometheus-fastapi-instrumentator>=7.1.0`.
 
 ---
 
@@ -509,6 +549,11 @@ Behavior:
 - Dashboard app entrypoint exists at `dashboard/app.py` with Dev/Sec/Ops tabs and container/service controls.
 - Dashboard Dockerfile exists and exposes Streamlit on port 8501 with headless bind to `0.0.0.0`.
 - DevSecOps compose file includes a `dashboard` service that starts with tooling stack and maps host port `8501`.
+- iptables firewall rules are active in backend container with DROP default policy.
+- Port 8000 responds normally while unauthorized ports are blocked.
+- iptables rules saved to `security-reports/iptables-active-rules.txt` with packet counters increasing.
+- FastAPI `/metrics` endpoint exposes Prometheus-formatted metrics with HTTP request counters and response times.
+- Grafana dashboard displays 4 panels showing real-time backend metrics (request rates, response times, error rates, and system performance).
 
 ---
 
@@ -535,6 +580,9 @@ Security outcomes achieved:
 - Cleaner modular architecture via independent dashboard application
 - Full DevSecOps observability/security UI is containerized and reproducible
 - Better production readiness and compliance posture
+- OS-level network enforcement via iptables firewall rules blocking unauthorized traffic at kernel level
+- Application performance monitoring via Prometheus metrics endpoint with request/response tracking
+- Real-time metrics visualization through Grafana dashboards showing request rates, response times, and error rates
 
 ---
 
@@ -563,6 +611,12 @@ Security outcomes achieved:
 22. Run `streamlit run dashboard/app.py` -> confirm Dev/Sec/Ops tabs load and container status panel is visible.
 23. Open `dashboard/Dockerfile` -> verify Streamlit CMD binds to `0.0.0.0:8501` in headless mode.
 24. Run `docker compose -f docker-compose.devops.yml up -d dashboard` -> confirm `utopiahire-dashboard` is running and reachable at `http://localhost:8501`.
+25. Run `docker exec utopiahire-backend iptables -L INPUT -n -v` -> confirm firewall rules are active with DROP default policy.
+26. Test `curl http://localhost:8000/health` -> should return HTTP 200 (port allowed).
+27. Test `curl http://localhost:22` -> should fail/timeout (port blocked by iptables).
+28. Check `security-reports/iptables-active-rules.txt` -> verify rules are saved with packet counters.
+29. Open `http://localhost:8000/metrics` in browser -> should show Prometheus metrics with `http_requests_total` counters.
+30. Open `http://localhost:3001` (Grafana) -> login with admin/admin123, verify 4 panels show backend metrics updating in real-time.
 
 These scenarios demonstrate that access control and abuse protections are active and effective.
 

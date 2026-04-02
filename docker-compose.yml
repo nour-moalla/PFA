@@ -3,6 +3,9 @@ services:
   backend:
     build: ./backend
     container_name: utopiahire-backend
+    cap_add:
+      - NET_ADMIN    # allows network administration (needed for iptables)
+      - NET_RAW      # allows raw packet access
     ports:
       - "8000:8000"
     env_file:

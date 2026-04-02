@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from prometheus_fastapi_instrumentator import Instrumentator
 
 
 
@@ -22,8 +23,6 @@ from app.routers import (
     career_insights,
     job_matching
 )
-from app.core.config import settings
-from app.core.auth import get_current_user
 from app.core.rate_limit import limiter
 
 logging.basicConfig(
@@ -81,6 +80,9 @@ app.include_router(
     dependencies=[Depends(get_current_user)],
 )
 
+# Add Prometheus metrics instrumentation
+Instrumentator().instrument(app).expose(app)
+
 
 @app.get("/", tags=["Health"])
 async def root():
@@ -94,7 +96,8 @@ async def root():
 
 
 @app.get("/health", tags=["Health"])
-async def health_check():
+@limiter.limit("5/minute")  # Temporary rate limit for demonstration
+async def health_check(request: Request):
     """Health check endpoint"""
     return {
         "status": "healthy",

@@ -31,3 +31,4 @@ tenacity==8.2.3
 tqdm==4.66.1
 slowapi>=0.1.9
 python-magic>=0.4.27
+prometheus-fastapi-instrumentator>=7.1.0
