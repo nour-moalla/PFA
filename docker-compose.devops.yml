@@ -5,12 +5,14 @@ services:
   jenkins:
       image: jenkins/jenkins:lts
       container_name: jenkins
+      user: root   # ← Add this line
       ports:
         - "8080:8080"
         - "50000:50000"
       volumes:
         - jenkins_data:/var/jenkins_home
         - /var/run/docker.sock:/var/run/docker.sock
+        - /usr/bin/docker:/usr/bin/docker   # ← Mount the Docker binary too
       networks:
         - default
         - app_network
@@ -85,5 +87,5 @@ volumes:
 networks:
   default:
   app_network:
-  external: true
-  name: utopiahire-main_default
+    external: true
+    name: utopiahire-main_default
