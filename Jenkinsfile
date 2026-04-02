@@ -14,7 +14,6 @@ pipeline {
                 echo 'Pulling latest code from GitHub...'
                 sh '''
                     rm -rf *
-                    git clone https://github.com/nour-moalla/PFA.git .
                     git config --global --add safe.directory $(pwd)
                     mkdir -p ${REPORT_DIR}
                 '''
