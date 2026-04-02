@@ -13,7 +13,10 @@ pipeline {
             steps {
                 echo 'Pulling latest code from GitHub...'
                 checkout scm
-                sh 'mkdir -p ${REPORT_DIR}'
+                sh '''
+                    git config --global --add safe.directory $(pwd)
+                    mkdir -p ${REPORT_DIR}
+                '''
             }
         }
 
