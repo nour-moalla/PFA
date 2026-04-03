@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         SONARQUBE_URL = 'http://sonarqube:9000'
+        SONAR_TOKEN   = credentials('sonarqube-token')
         APP_BACKEND   = 'http://utopiahire-backend:8000'
         REPORT_DIR    = 'security-reports'
     }
@@ -104,6 +105,7 @@ pipeline {
 
                     docker run --rm \
                       -e SONAR_HOST_URL=${SONARQUBE_URL} \
+                                            -e SONAR_TOKEN=${SONAR_TOKEN} \
                       -v $(pwd):/usr/src \
                       sonarsource/sonar-scanner-cli \
                       -Dsonar.projectKey=utopiahire \
@@ -412,16 +414,14 @@ pipeline {
 
     post {
         always {
-            node('built-in') {
-                echo 'Bundling all security reports...'
-                sh '''
-                    mkdir -p security-reports
-                    cd security-reports
-                    zip -r ../security-report-bundle.zip . 2>/dev/null || true
-                '''
-                archiveArtifacts artifacts: 'security-report-bundle.zip',
-                                 allowEmptyArchive: true
-            }
+            echo 'Bundling all security reports...'
+            sh '''
+                mkdir -p security-reports
+                cd security-reports
+                zip -r ../security-report-bundle.zip . 2>/dev/null || true
+            '''
+            archiveArtifacts artifacts: 'security-report-bundle.zip',
+                             allowEmptyArchive: true
         }
         success {
             echo 'ALL SECURITY GATES PASSED — pipeline is clean'
