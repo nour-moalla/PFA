@@ -85,11 +85,11 @@ pipeline {
                     docker run --rm \
                     -v $(pwd):/path \
                     --entrypoint sh \
-                    -e GIT_DISCOVERY_ACROSS_FILESYSTEM=1 \
                     zricethezav/gitleaks:latest -c \
                     "mkdir -p /path/security-reports && \
                     gitleaks detect \
                     --source /path \
+                    --no-git \
                     --report-path /path/security-reports/gitleaks-report.json \
                     --exit-code 1" || true
                 '''
@@ -111,7 +111,7 @@ pipeline {
                     fi
 
                     docker run --rm \
-                                            --network utopiahire-pipeline_default \
+                                            --network pfa_default \
                       -e SONAR_HOST_URL=${SONARQUBE_URL} \
                       -e SONAR_TOKEN=${SONAR_TOKEN} \
                       -v $(pwd):/usr/src \
@@ -133,35 +133,21 @@ pipeline {
                         exit 0
                     fi
 
-                                        BACK_REQ=$(find backend -name requirements.txt | head -n 1)
-                                        FRONT_PKG=$(find frontend -name package.json | head -n 1)
-
-                                        if [ -z "$BACK_REQ" ]; then
-                                                echo "No requirements.txt found under backend/."
-                                                exit 1
-                                        fi
-                                        if [ -z "$FRONT_PKG" ]; then
-                                                echo "No package.json found under frontend/."
-                                                exit 1
-                                        fi
-
                     docker run --rm \
-                                            -v $(pwd):/workspace \
-                                            -w /workspace \
+                      -v $(pwd):/workspace \
+                      -w /workspace \
                       python:3.11-slim \
-                                            sh -c "pip install pip-audit -q && pip-audit -r /workspace/$BACK_REQ \
-                                                --format json -o /workspace/${REPORT_DIR}/pip-audit.json || true"
+                      sh -c "pip install pip-audit -q && pip-audit -r /workspace/backend/requirements.txt --format json -o /workspace/${REPORT_DIR}/pip-audit.json" || true
 
-                                        test -f ${REPORT_DIR}/pip-audit.json || true
+                    test -f ${REPORT_DIR}/pip-audit.json || true
 
                     docker run --rm \
-                                            -v $(pwd):/workspace \
-                                            -w /workspace \
+                      -v $(pwd):/workspace \
+                      -w /workspace \
                       node:20-alpine \
-                                            sh -c "cd /workspace/$(dirname $FRONT_PKG) && npm install --prefer-offline -q && \
-                                                npm audit --json > /workspace/${REPORT_DIR}/npm-audit.json 2>&1 || true"
+                      sh -c "cd /workspace/frontend && npm install --prefer-offline -q && npm audit --json > /workspace/${REPORT_DIR}/npm-audit.json 2>&1" || true
 
-                                        test -f ${REPORT_DIR}/npm-audit.json || true
+                    test -f ${REPORT_DIR}/npm-audit.json || true
                 '''
             }
             post {
@@ -205,20 +191,20 @@ pipeline {
                     docker run --rm \
                       -v /var/run/docker.sock:/var/run/docker.sock \
                       -v $(pwd)/${REPORT_DIR}:/reports \
-                      aquasec/trivy:latest image \
+                                            ghcr.io/aquasecurity/trivy:latest image \
                       --format json \
                       --output /reports/trivy-backend.json \
                       --severity CRITICAL,HIGH \
-                                            utopiahire-pipeline2-backend || true
+                                            utopiahire-pipeline-backend || true
 
                     docker run --rm \
                       -v /var/run/docker.sock:/var/run/docker.sock \
                       -v $(pwd)/${REPORT_DIR}:/reports \
-                      aquasec/trivy:latest image \
+                                            ghcr.io/aquasecurity/trivy:latest image \
                       --format json \
                       --output /reports/trivy-frontend.json \
                       --severity CRITICAL,HIGH \
-                                            utopiahire-pipeline2-frontend || true
+                                            utopiahire-pipeline-frontend || true
                 '''
             }
             post {
@@ -242,6 +228,7 @@ pipeline {
                       -v $(pwd):/tf \
                       bridgecrew/checkov:latest \
                       -d /tf \
+                                            --framework dockerfile \
                       --output json \
                                             --output-file-path /tf/${REPORT_DIR}/ || true
                 '''
@@ -265,6 +252,8 @@ pipeline {
 
                     docker rm -f utopiahire-backend  2>/dev/null || true
                     docker rm -f utopiahire-frontend 2>/dev/null || true
+                    docker rm -f utopiahire-pipeline-backend 2>/dev/null || true
+                    docker rm -f utopiahire-pipeline-frontend 2>/dev/null || true
                     docker rm -f utopiahire-pipeline2-backend 2>/dev/null || true
                     docker rm -f utopiahire-pipeline2-frontend 2>/dev/null || true
                     if docker compose version >/dev/null 2>&1; then
@@ -309,9 +298,12 @@ pipeline {
                     fi
 
                     echo "ZAP scanning target: http://utopiahire-backend:8000"
+                    mkdir -p $(pwd)/${REPORT_DIR}
+                    chmod 777 $(pwd)/${REPORT_DIR} || true
                     docker run --rm \
-                        --network utopiahire-pipeline_default \
+                        --network pfa_default \
                         -v $(pwd)/${REPORT_DIR}:/zap/wrk:rw \
+                        -u root \
                         ghcr.io/zaproxy/zaproxy:stable \
                         zap-baseline.py \
                         -t http://utopiahire-backend:8000 \
@@ -337,17 +329,18 @@ pipeline {
                         exit 0
                     fi
 
-                    APP_URL="http://utopiahire-backend:8000"
+                    APP_URL="http://localhost:8000"
                     echo "Target: $APP_URL"
                     mkdir -p security-reports
 
                     echo "=== SQL Injection Test ===" | tee security-reports/attack-results.txt
 
                     docker run --rm \
+                    --network pfa_default \
                     python:3.11-slim bash -c "
                         pip install sqlmap >/dev/null 2>&1 &&
                         sqlmap \
-                        -u '${APP_URL}/api/jobs/database-info' \
+                        -u 'http://utopiahire-backend:8000/api/jobs/database-info' \
                         --batch \
                         --level=1 \
                         --ignore-code=401 \
@@ -460,8 +453,7 @@ pipeline {
             echo 'Bundling all security reports...'
             sh '''
                 mkdir -p security-reports
-                cd security-reports
-                zip -r ../security-report-bundle.zip . 2>/dev/null || true
+                zip -r security-report-bundle.zip security-reports/ 2>/dev/null || true
             '''
             archiveArtifacts artifacts: 'security-report-bundle.zip',
                              allowEmptyArchive: true
