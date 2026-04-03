@@ -15,7 +15,8 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from prometheus_fastapi_instrumentator import Instrumentator
 
-
+from app.core.auth import get_current_user
+from app.core.config import settings
 
 from app.routers import (
     resume,
