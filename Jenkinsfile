@@ -19,33 +19,45 @@ pipeline {
 
         stage('Prepare Environment') {
             steps {
-                echo 'Creating .env files from Jenkins credentials...'
-                withCredentials([
-                    string(credentialsId: 'AI_API_KEY',                    variable: 'V_AI_API_KEY'),
-                    string(credentialsId: 'AI_BASE_URL',                   variable: 'V_AI_BASE_URL'),
-                    string(credentialsId: 'AI_MODEL',                      variable: 'V_AI_MODEL'),
-                    string(credentialsId: 'VITE_FIREBASE_API_KEY',         variable: 'V_FB_API_KEY'),
-                    string(credentialsId: 'VITE_FIREBASE_AUTH_DOMAIN',     variable: 'V_FB_AUTH'),
-                    string(credentialsId: 'VITE_FIREBASE_PROJECT_ID',      variable: 'V_FB_PROJECT'),
-                    string(credentialsId: 'VITE_FIREBASE_STORAGE_BUCKET',  variable: 'V_FB_BUCKET'),
-                    string(credentialsId: 'VITE_FIREBASE_MESSAGING_SENDER_ID', variable: 'V_FB_SENDER'),
-                    string(credentialsId: 'VITE_FIREBASE_APP_ID',          variable: 'V_FB_APP_ID')
-                ]) {
-                    sh '''
-                        printf "AI_API_KEY=%s\nAI_BASE_URL=%s\nAI_MODEL=%s\n" \
-                        "$V_AI_API_KEY" "$V_AI_BASE_URL" "$V_AI_MODEL" \
-                        > backend/.env
+                echo 'Creating .env files from templates and optional Jenkins environment variables...'
+                sh '''
+                    set -e
 
-                        printf "VITE_FIREBASE_API_KEY=%s\nVITE_FIREBASE_AUTH_DOMAIN=%s\nVITE_FIREBASE_PROJECT_ID=%s\nVITE_FIREBASE_STORAGE_BUCKET=%s\nVITE_FIREBASE_MESSAGING_SENDER_ID=%s\nVITE_FIREBASE_APP_ID=%s\n" \
-                        "$V_FB_API_KEY" "$V_FB_AUTH" "$V_FB_PROJECT" \
-                        "$V_FB_BUCKET" "$V_FB_SENDER" "$V_FB_APP_ID" \
-                        > frontend/.env
+                    cp backend/.env.example backend/.env
+                    cp frontend/.env.example frontend/.env
 
-                        echo "backend/.env created with 3 variables"
-                        echo "frontend/.env created with 6 variables"
-                        echo "AI_MODEL = $V_AI_MODEL"
-                    '''
-                }
+                    if [ -n "${AI_API_KEY:-}" ]; then
+                        sed -i "s|^AI_API_KEY=.*|AI_API_KEY=${AI_API_KEY}|" backend/.env
+                    fi
+                    if [ -n "${AI_BASE_URL:-}" ]; then
+                        sed -i "s|^AI_BASE_URL=.*|AI_BASE_URL=${AI_BASE_URL}|" backend/.env
+                    fi
+                    if [ -n "${AI_MODEL:-}" ]; then
+                        sed -i "s|^AI_MODEL=.*|AI_MODEL=${AI_MODEL}|" backend/.env
+                    fi
+
+                    if [ -n "${VITE_FIREBASE_API_KEY:-}" ]; then
+                        sed -i "s|^VITE_FIREBASE_API_KEY=.*|VITE_FIREBASE_API_KEY=${VITE_FIREBASE_API_KEY}|" frontend/.env
+                    fi
+                    if [ -n "${VITE_FIREBASE_AUTH_DOMAIN:-}" ]; then
+                        sed -i "s|^VITE_FIREBASE_AUTH_DOMAIN=.*|VITE_FIREBASE_AUTH_DOMAIN=${VITE_FIREBASE_AUTH_DOMAIN}|" frontend/.env
+                    fi
+                    if [ -n "${VITE_FIREBASE_PROJECT_ID:-}" ]; then
+                        sed -i "s|^VITE_FIREBASE_PROJECT_ID=.*|VITE_FIREBASE_PROJECT_ID=${VITE_FIREBASE_PROJECT_ID}|" frontend/.env
+                    fi
+                    if [ -n "${VITE_FIREBASE_STORAGE_BUCKET:-}" ]; then
+                        sed -i "s|^VITE_FIREBASE_STORAGE_BUCKET=.*|VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET}|" frontend/.env
+                    fi
+                    if [ -n "${VITE_FIREBASE_MESSAGING_SENDER_ID:-}" ]; then
+                        sed -i "s|^VITE_FIREBASE_MESSAGING_SENDER_ID=.*|VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID}|" frontend/.env
+                    fi
+                    if [ -n "${VITE_FIREBASE_APP_ID:-}" ]; then
+                        sed -i "s|^VITE_FIREBASE_APP_ID=.*|VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID}|" frontend/.env
+                    fi
+
+                    echo "backend/.env created from backend/.env.example"
+                    echo "frontend/.env created from frontend/.env.example"
+                '''
             }
         }
         stage('Secrets Scan — Gitleaks') {
