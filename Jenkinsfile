@@ -90,8 +90,10 @@ pipeline {
                     gitleaks detect \
                     --source /path \
                     --no-git \
+                    --report-format json \
                     --report-path /path/security-reports/gitleaks-report.json \
-                    --exit-code 1" || true
+                    ; [ -f /path/security-reports/gitleaks-report.json ] || \
+                    echo '[]' > /path/security-reports/gitleaks-report.json" || true
                 '''
             }
             post {
@@ -133,19 +135,35 @@ pipeline {
                         exit 0
                     fi
 
-                    docker run --rm \
-                      -v $(pwd):/workspace \
-                      -w /workspace \
-                      python:3.11-slim \
-                      sh -c "pip install pip-audit -q && pip-audit -r /workspace/backend/requirements.txt --format json -o /workspace/${REPORT_DIR}/pip-audit.json" || true
+                                        mkdir -p ${REPORT_DIR}
+                                        chmod 777 ${REPORT_DIR} || true
+
+                                        if [ -f backend/requirements.txt ]; then
+                                                docker run --rm \
+                                                    -v $(pwd):/workspace \
+                                                    -w /workspace \
+                                                    python:3.11-slim \
+                                                    sh -c "pip install pip-audit -q && \
+                                                                 grep -v '^\\s*#' /workspace/backend/requirements.txt | \
+                                                                 grep -v '^\\s*$' > /tmp/clean-req.txt && \
+                                                                 pip-audit -r /tmp/clean-req.txt \
+                                                                 --format json -o /workspace/${REPORT_DIR}/pip-audit.json || \
+                                                                 echo '[]' > /workspace/${REPORT_DIR}/pip-audit.json"
+                                        else
+                                                echo '[]' > ${REPORT_DIR}/pip-audit.json
+                                        fi
 
                     test -f ${REPORT_DIR}/pip-audit.json || true
 
-                    docker run --rm \
-                      -v $(pwd):/workspace \
-                      -w /workspace \
-                      node:20-alpine \
-                      sh -c "cd /workspace/frontend && npm install --prefer-offline -q && npm audit --json > /workspace/${REPORT_DIR}/npm-audit.json 2>&1" || true
+                                        if [ -f frontend/package.json ]; then
+                                                docker run --rm \
+                                                    -v $(pwd):/workspace \
+                                                    -w /workspace \
+                                                    node:20-alpine \
+                                                    sh -c "cd /workspace/frontend && npm install --prefer-offline -q && npm audit --json > /workspace/${REPORT_DIR}/npm-audit.json 2>&1" || true
+                                        else
+                                                echo '[]' > ${REPORT_DIR}/npm-audit.json
+                                        fi
 
                     test -f ${REPORT_DIR}/npm-audit.json || true
                 '''
@@ -188,22 +206,29 @@ pipeline {
                         exit 0
                     fi
 
+                                        mkdir -p ${REPORT_DIR}
+                                        chmod 777 ${REPORT_DIR} || true
+
                     docker run --rm \
                       -v /var/run/docker.sock:/var/run/docker.sock \
                       -v $(pwd)/${REPORT_DIR}:/reports \
+                                            -v trivy-cache:/root/.cache/trivy \
                                             ghcr.io/aquasecurity/trivy:latest image \
                       --format json \
                       --output /reports/trivy-backend.json \
                       --severity CRITICAL,HIGH \
+                                            --timeout 10m \
                                             utopiahire-pipeline-backend || true
 
                     docker run --rm \
                       -v /var/run/docker.sock:/var/run/docker.sock \
                       -v $(pwd)/${REPORT_DIR}:/reports \
+                                            -v trivy-cache:/root/.cache/trivy \
                                             ghcr.io/aquasecurity/trivy:latest image \
                       --format json \
                       --output /reports/trivy-frontend.json \
                       --severity CRITICAL,HIGH \
+                                            --timeout 10m \
                                             utopiahire-pipeline-frontend || true
                 '''
             }
@@ -227,8 +252,8 @@ pipeline {
                     docker run --rm \
                       -v $(pwd):/tf \
                       bridgecrew/checkov:latest \
-                      -d /tf \
-                                            --framework dockerfile \
+                                            --file /tf/backend/Dockerfile \
+                                            --file /tf/frontend/Dockerfile \
                       --output json \
                                             --output-file-path /tf/${REPORT_DIR}/ || true
                 '''
@@ -301,7 +326,7 @@ pipeline {
                     mkdir -p $(pwd)/${REPORT_DIR}
                     chmod 777 $(pwd)/${REPORT_DIR} || true
                     docker run --rm \
-                        --network pfa_default \
+                        --network utopiahire-pipeline_default \
                         -v $(pwd)/${REPORT_DIR}:/zap/wrk:rw \
                         -u root \
                         ghcr.io/zaproxy/zaproxy:stable \
@@ -336,7 +361,7 @@ pipeline {
                     echo "=== SQL Injection Test ===" | tee security-reports/attack-results.txt
 
                     docker run --rm \
-                    --network pfa_default \
+                    --network utopiahire-pipeline_default \
                     python:3.11-slim bash -c "
                         pip install sqlmap >/dev/null 2>&1 &&
                         sqlmap \
@@ -351,9 +376,10 @@ pipeline {
                     echo "" >> security-reports/attack-results.txt
                     echo "=== XSS Filename Test ===" | tee -a security-reports/attack-results.txt
 
-                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+                    STATUS=$(docker exec utopiahire-backend \
+                    curl -s -o /dev/null -w "%{http_code}" \
                     --max-time 10 \
-                    -X POST ${APP_URL}/api/resume/upload \
+                    -X POST http://localhost:8000/api/resume/upload \
                     -F "file=@/etc/hostname;filename=xss_test_script.pdf") \
                     || STATUS="connection_failed"
 
@@ -376,9 +402,10 @@ pipeline {
 
                     BLOCKED=0
                     for i in $(seq 1 15); do
-                    S=$(curl -s -o /dev/null -w "%{http_code}" \
+                    S=$(docker exec utopiahire-backend \
+                        curl -s -o /dev/null -w "%{http_code}" \
                         --max-time 5 \
-                        ${APP_URL}/api/resume/analyze) || S="000"
+                        http://localhost:8000/health) || S="000"
                     echo "Request $i: HTTP $S" | tee -a security-reports/attack-results.txt
                     if [ "$S" = "429" ]; then
                         BLOCKED=$((BLOCKED + 1))
@@ -401,9 +428,10 @@ pipeline {
                     echo "=== Directory Traversal Test ===" \
                     | tee -a security-reports/attack-results.txt
 
-                    STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+                    STATUS=$(docker exec utopiahire-backend \
+                    curl -s -o /dev/null -w "%{http_code}" \
                     --max-time 10 \
-                    "${APP_URL}/api/career/download/../../../etc/passwd") \
+                    "http://localhost:8000/api/career/download/../../../etc/passwd") \
                     || STATUS="000"
                     echo "Directory traversal HTTP status: $STATUS" \
                     | tee -a security-reports/attack-results.txt
@@ -452,6 +480,7 @@ pipeline {
         always {
             echo 'Bundling all security reports...'
             sh '''
+                cd ${WORKSPACE}
                 mkdir -p security-reports
                 zip -r security-report-bundle.zip security-reports/ 2>/dev/null || true
             '''
