@@ -99,7 +99,7 @@ pipeline {
                                     allowEmptyArchive: true
                 }
             }
-        }}
+        }
         stage('SAST — SonarQube Analysis') {
             steps {
                 echo 'Running SonarQube static security analysis...'
