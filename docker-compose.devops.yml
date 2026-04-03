@@ -1,22 +1,16 @@
-version: '3.8'
-
 services:
 
   jenkins:
-      image: jenkins/jenkins:lts
-      container_name: jenkins
-      user: root   # ← Add this line
-      ports:
-        - "8080:8080"
-        - "50000:50000"
-      volumes:
-        - jenkins_data:/var/jenkins_home
-        - /var/run/docker.sock:/var/run/docker.sock
-        - /usr/bin/docker:/usr/bin/docker   # ← Mount the Docker binary too
-      networks:
-        - default
-        - app_network
-      restart: unless-stopped
+    image: jenkins/jenkins:lts
+    container_name: jenkins
+    user: root
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
 
   sonarqube:
     image: sonarqube:community
@@ -83,9 +77,3 @@ volumes:
   sonar_data:
   sonar_logs:
   grafana_data:
-
-networks:
-  default:
-  app_network:
-    external: true
-    name: utopiahire-main_default
