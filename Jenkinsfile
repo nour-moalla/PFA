@@ -85,6 +85,7 @@ pipeline {
                     docker run --rm \
                     -v $(pwd):/path \
                     --entrypoint sh \
+                    -e GIT_DISCOVERY_ACROSS_FILESYSTEM=1 \
                     zricethezav/gitleaks:latest -c \
                     "mkdir -p /path/security-reports && \
                     gitleaks detect \
@@ -208,7 +209,7 @@ pipeline {
                       --format json \
                       --output /reports/trivy-backend.json \
                       --severity CRITICAL,HIGH \
-                      utopiahire-main-backend || true
+                                            utopiahire-pipeline2-backend || true
 
                     docker run --rm \
                       -v /var/run/docker.sock:/var/run/docker.sock \
@@ -217,7 +218,7 @@ pipeline {
                       --format json \
                       --output /reports/trivy-frontend.json \
                       --severity CRITICAL,HIGH \
-                      utopiahire-main-frontend || true
+                                            utopiahire-pipeline2-frontend || true
                 '''
             }
             post {
@@ -242,7 +243,7 @@ pipeline {
                       bridgecrew/checkov:latest \
                       -d /tf \
                       --output json \
-                      --output-file-path /tf/${REPORT_DIR} || true
+                                            --output-file-path /tf/${REPORT_DIR}/ || true
                 '''
             }
             post {
@@ -264,10 +265,12 @@ pipeline {
 
                     docker rm -f utopiahire-backend  2>/dev/null || true
                     docker rm -f utopiahire-frontend 2>/dev/null || true
+                    docker rm -f utopiahire-pipeline2-backend 2>/dev/null || true
+                    docker rm -f utopiahire-pipeline2-frontend 2>/dev/null || true
                     if docker compose version >/dev/null 2>&1; then
-                        docker compose down --remove-orphans 2>/dev/null || true
+                        docker compose down --remove-orphans --volumes 2>/dev/null || true
                     elif command -v docker-compose >/dev/null 2>&1; then
-                        docker-compose down --remove-orphans 2>/dev/null || true
+                        docker-compose down --remove-orphans --volumes 2>/dev/null || true
                     fi
 
                     echo "Starting fresh containers..."
