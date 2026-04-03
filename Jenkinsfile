@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        SONARQUBE_URL = 'http://sonarqube:9000'
+        SONARQUBE_URL = 'http://utopiahire-sonarqube:9000'
         SONAR_TOKEN   = credentials('sonarqube-token')
         APP_BACKEND   = 'http://utopiahire-backend:8000'
         REPORT_DIR    = 'security-reports'
@@ -79,6 +79,9 @@ pipeline {
                         exit 0
                     fi
 
+                    mkdir -p $(pwd)/${REPORT_DIR}
+                    chmod 777 $(pwd)/${REPORT_DIR} || true
+
                     docker run --rm -v $(pwd):/path \
                       zricethezav/gitleaks:latest detect \
                       --source /path \
@@ -104,8 +107,9 @@ pipeline {
                     fi
 
                     docker run --rm \
+                      --network pfa_default \
                       -e SONAR_HOST_URL=${SONARQUBE_URL} \
-                                            -e SONAR_TOKEN=${SONAR_TOKEN} \
+                      -e SONAR_TOKEN=${SONAR_TOKEN} \
                       -v $(pwd):/usr/src \
                       sonarsource/sonar-scanner-cli \
                       -Dsonar.projectKey=utopiahire \
@@ -125,21 +129,35 @@ pipeline {
                         exit 0
                     fi
 
+                                        BACK_REQ=$(find backend -name requirements.txt | head -n 1)
+                                        FRONT_PKG=$(find frontend -name package.json | head -n 1)
+
+                                        if [ -z "$BACK_REQ" ]; then
+                                                echo "No requirements.txt found under backend/."
+                                                exit 1
+                                        fi
+                                        if [ -z "$FRONT_PKG" ]; then
+                                                echo "No package.json found under frontend/."
+                                                exit 1
+                                        fi
+
                     docker run --rm \
-                      -v $(pwd)/backend:/app \
+                                            -v $(pwd):/workspace \
+                                            -w /workspace \
                       python:3.11-slim \
-                      sh -c "pip install pip-audit -q && pip-audit -r /app/requirements.txt \
-                        --format json -o /app/pip-audit.json || true"
+                                            sh -c "pip install pip-audit -q && pip-audit -r /workspace/$BACK_REQ \
+                                                --format json -o /workspace/${REPORT_DIR}/pip-audit.json || true"
 
-                    cp backend/pip-audit.json ${REPORT_DIR}/pip-audit.json || true
+                                        test -f ${REPORT_DIR}/pip-audit.json || true
 
                     docker run --rm \
-                      -v $(pwd)/frontend:/app \
+                                            -v $(pwd):/workspace \
+                                            -w /workspace \
                       node:20-alpine \
-                      sh -c "cd /app && npm install --prefer-offline -q && \
-                        npm audit --json > /app/npm-audit.json 2>&1 || true"
+                                            sh -c "cd /workspace/$(dirname $FRONT_PKG) && npm install --prefer-offline -q && \
+                                                npm audit --json > /workspace/${REPORT_DIR}/npm-audit.json 2>&1 || true"
 
-                    cp frontend/npm-audit.json ${REPORT_DIR}/npm-audit.json || true
+                                        test -f ${REPORT_DIR}/npm-audit.json || true
                 '''
             }
             post {
@@ -159,7 +177,14 @@ pipeline {
                         exit 0
                     fi
 
-                    docker compose build
+                    if docker compose version >/dev/null 2>&1; then
+                        docker compose build
+                    elif command -v docker-compose >/dev/null 2>&1; then
+                        docker-compose build
+                    else
+                        echo "Neither 'docker compose' nor 'docker-compose' is available."
+                        exit 1
+                    fi
                 '''
             }
         }
@@ -236,10 +261,21 @@ pipeline {
 
                     docker rm -f utopiahire-backend  2>/dev/null || true
                     docker rm -f utopiahire-frontend 2>/dev/null || true
-                    docker compose down --remove-orphans 2>/dev/null || true
+                    if docker compose version >/dev/null 2>&1; then
+                        docker compose down --remove-orphans 2>/dev/null || true
+                    elif command -v docker-compose >/dev/null 2>&1; then
+                        docker-compose down --remove-orphans 2>/dev/null || true
+                    fi
 
                     echo "Starting fresh containers..."
-                    docker compose up -d --build --force-recreate
+                    if docker compose version >/dev/null 2>&1; then
+                        docker compose up -d --build --force-recreate
+                    elif command -v docker-compose >/dev/null 2>&1; then
+                        docker-compose up -d --build --force-recreate
+                    else
+                        echo "Neither 'docker compose' nor 'docker-compose' is available."
+                        exit 1
+                    fi
 
                     echo "Waiting for backend to be healthy..."
                     for i in $(seq 1 20); do
