@@ -79,24 +79,24 @@ pipeline {
                         exit 0
                     fi
 
-                    mkdir -p $(pwd)/${REPORT_DIR}
-                    chmod 777 $(pwd)/${REPORT_DIR} || true
+                    mkdir -p ${REPORT_DIR}
+                    chmod 777 ${REPORT_DIR}
 
-                    docker run --rm -v $(pwd):/path \
-                      zricethezav/gitleaks:latest detect \
-                      --source /path \
-                      --report-path /path/${REPORT_DIR}/gitleaks-report.json \
-                      --exit-code 1 || true
+                    docker run --rm \
+                    -v $(pwd):/path \
+                    zricethezav/gitleaks:latest detect \
+                    --source /path \
+                    --report-path /path/${REPORT_DIR}/gitleaks-report.json \
+                    --exit-code 1 || true
                 '''
             }
             post {
                 always {
                     archiveArtifacts artifacts: "${REPORT_DIR}/gitleaks-report.json",
-                                     allowEmptyArchive: true
+                                    allowEmptyArchive: true
                 }
             }
         }
-
         stage('SAST — SonarQube Analysis') {
             steps {
                 echo 'Running SonarQube static security analysis...'
