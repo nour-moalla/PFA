@@ -111,7 +111,7 @@ pipeline {
                     fi
 
                     docker run --rm \
-                      --network pfa_default \
+                                            --network utopiahire-pipeline_default \
                       -e SONAR_HOST_URL=${SONARQUBE_URL} \
                       -e SONAR_TOKEN=${SONAR_TOKEN} \
                       -v $(pwd):/usr/src \
@@ -285,9 +285,10 @@ pipeline {
 
                     echo "Waiting for backend to be healthy..."
                     for i in $(seq 1 20); do
-                        STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-                        --max-time 5 \
-                        http://utopiahire-backend:8000/health) || STATUS="000"
+                        STATUS=$(docker exec utopiahire-backend \
+                            curl -s -o /dev/null -w "%{http_code}" \
+                            --max-time 5 \
+                            http://localhost:8000/health) || STATUS="000"
                         echo "Attempt $i: HTTP $STATUS"
                         if [ "$STATUS" = "200" ]; then
                             echo "Backend is healthy and ready"
