@@ -84,10 +84,13 @@ pipeline {
 
                     docker run --rm \
                     -v $(pwd):/path \
-                    zricethezav/gitleaks:latest detect \
+                    --entrypoint sh \
+                    zricethezav/gitleaks:latest -c \
+                    "mkdir -p /path/security-reports && \
+                    gitleaks detect \
                     --source /path \
-                    --report-path /path/${REPORT_DIR}/gitleaks-report.json \
-                    --exit-code 1 || true
+                    --report-path /path/security-reports/gitleaks-report.json \
+                    --exit-code 1" || true
                 '''
             }
             post {
@@ -96,7 +99,7 @@ pipeline {
                                     allowEmptyArchive: true
                 }
             }
-        }
+        }}
         stage('SAST — SonarQube Analysis') {
             steps {
                 echo 'Running SonarQube static security analysis...'
