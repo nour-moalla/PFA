@@ -134,37 +134,54 @@ pipeline {
                         echo "Docker access is unavailable on this Jenkins agent; skipping dependency audit."
                         exit 0
                     fi
+                    mkdir -p ${REPORT_DIR}
+                    chmod 777 ${REPORT_DIR} || true
+                    mkdir -p .audit-tmp
 
-                                        mkdir -p ${REPORT_DIR}
-                                        chmod 777 ${REPORT_DIR} || true
+                    # Ensure target images are available for manifest extraction.
+                    if ! docker image inspect utopiahire-pipeline-backend >/dev/null 2>&1 || \
+                       ! docker image inspect utopiahire-pipeline-frontend >/dev/null 2>&1; then
+                        if docker compose version >/dev/null 2>&1; then
+                            docker compose build backend frontend || true
+                        elif command -v docker-compose >/dev/null 2>&1; then
+                            docker-compose build backend frontend || true
+                        fi
+                    fi
 
-                                        if [ -f backend/requirements.txt ]; then
-                                                docker run --rm \
-                                                    -v $(pwd):/workspace \
-                                                    -w /workspace \
-                                                    python:3.11-slim \
-                                                    sh -c "pip install pip-audit -q && \
-                                                                 grep -v '^\\s*#' /workspace/backend/requirements.txt | \
-                                                                 grep -v '^\\s*$' > /tmp/clean-req.txt && \
-                                                                 pip-audit -r /tmp/clean-req.txt \
-                                                                 --format json -o /workspace/${REPORT_DIR}/pip-audit.json || \
-                                                                 echo '[]' > /workspace/${REPORT_DIR}/pip-audit.json"
-                                        else
-                                                echo '[]' > ${REPORT_DIR}/pip-audit.json
-                                        fi
+                    # Backend dependency audit: extract requirements from image when repo file is unavailable.
+                    if docker image inspect utopiahire-pipeline-backend >/dev/null 2>&1; then
+                        docker run --rm utopiahire-pipeline-backend \
+                            cat /app/requirements.txt > .audit-tmp/requirements.txt || true
+                    fi
+                    if [ -s .audit-tmp/requirements.txt ]; then
+                        docker run --rm \
+                            -v $(pwd)/.audit-tmp/requirements.txt:/tmp/requirements.txt \
+                            -v $(pwd)/${REPORT_DIR}:/reports \
+                            python:3.11-slim \
+                            sh -c "pip install pip-audit -q && \
+                                   pip-audit -r /tmp/requirements.txt --format json -o /reports/pip-audit.json || true && \
+                                   test -s /reports/pip-audit.json || echo '[]' > /reports/pip-audit.json" || true
+                    else
+                        echo '[]' > ${REPORT_DIR}/pip-audit.json
+                    fi
+
+                    # Frontend dependency audit: extract package.json from image and run npm audit.
+                    if docker image inspect utopiahire-pipeline-frontend >/dev/null 2>&1; then
+                        docker run --rm utopiahire-pipeline-frontend \
+                            cat /app/package.json > .audit-tmp/package.json || true
+                    fi
+                    if [ -s .audit-tmp/package.json ]; then
+                        docker run --rm \
+                            -v $(pwd)/.audit-tmp/package.json:/app/package.json \
+                            -v $(pwd)/${REPORT_DIR}:/reports \
+                            node:20-alpine \
+                            sh -c "cd /app && npm audit --json 2>/dev/null > /reports/npm-audit.json || true && \
+                                   test -s /reports/npm-audit.json || echo '[]' > /reports/npm-audit.json" || true
+                    else
+                        echo '[]' > ${REPORT_DIR}/npm-audit.json
+                    fi
 
                     test -f ${REPORT_DIR}/pip-audit.json || true
-
-                                        if [ -f frontend/package.json ]; then
-                                                docker run --rm \
-                                                    -v $(pwd):/workspace \
-                                                    -w /workspace \
-                                                    node:20-alpine \
-                                                    sh -c "cd /workspace/frontend && npm install --prefer-offline -q && npm audit --json > /workspace/${REPORT_DIR}/npm-audit.json 2>&1" || true
-                                        else
-                                                echo '[]' > ${REPORT_DIR}/npm-audit.json
-                                        fi
-
                     test -f ${REPORT_DIR}/npm-audit.json || true
                 '''
             }
@@ -482,7 +499,7 @@ pipeline {
             sh '''
                 cd ${WORKSPACE}
                 mkdir -p security-reports
-                zip -r security-report-bundle.zip security-reports/ 2>/dev/null || true
+                zip -r ${WORKSPACE}/security-report-bundle.zip ${WORKSPACE}/security-reports/ 2>/dev/null || true
             '''
             archiveArtifacts artifacts: 'security-report-bundle.zip',
                              allowEmptyArchive: true
