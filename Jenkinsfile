@@ -114,7 +114,7 @@ pipeline {
                     fi
 
                     docker run --rm \
-                                            --network pfa_default \
+                                            --network utopiahire-main_default \
                       -e SONAR_HOST_URL=${SONARQUBE_URL} \
                       -e SONAR_TOKEN=${SONAR_TOKEN} \
                       -v $(pwd):/usr/src \
