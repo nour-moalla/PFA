@@ -90,10 +90,11 @@ pipeline {
                     gitleaks detect \
                     --source /path \
                     --no-git \
+                    --gitleaks-ignore-path /path/.gitleaksignore \
                     --report-format json \
-                    --report-path /path/security-reports/gitleaks-report.json \
-                    ; [ -f /path/security-reports/gitleaks-report.json ] || \
-                    echo '[]' > /path/security-reports/gitleaks-report.json" || true
+                    --report-path /path/security-reports/gitleaks-report.json; \
+                    [ -f /path/security-reports/gitleaks-report.json ] || \
+                    echo '[]' > /path/security-reports/gitleaks-report.json"
                 '''
             }
             post {
