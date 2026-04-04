@@ -1,0 +1,5 @@
+# Ignore .env files created from templates — these are not real secrets
+backend/.env
+frontend/.env
+backend/.env.example
+frontend/.env.example

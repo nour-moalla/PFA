@@ -136,8 +136,8 @@ pipeline {
                     fi
                     mkdir -p ${REPORT_DIR}
                     chmod 777 ${REPORT_DIR} || true
-                    mkdir -p .audit-tmp
-                          rm -rf .audit-tmp/requirements.txt .audit-tmp/package.json
+                                        mkdir -p .audit-tmp
+                                        rm -rf .audit-tmp/requirements.txt .audit-tmp/package.json
 
                     # Ensure target images are available for manifest extraction.
                     if ! docker image inspect utopiahire-pipeline-backend >/dev/null 2>&1 || \
@@ -152,15 +152,15 @@ pipeline {
                     # Backend dependency audit: extract requirements from image when repo file is unavailable.
                     if docker image inspect utopiahire-pipeline-backend >/dev/null 2>&1; then
                         docker run --rm utopiahire-pipeline-backend \
-                            cat /app/requirements.txt > .audit-tmp/requirements.txt || true
+                            cat /app/requirements.txt > .audit-tmp/requirements.txt 2>/dev/null || true
                     fi
                     if [ -s .audit-tmp/requirements.txt ]; then
                         docker run --rm \
-                            -v $(pwd)/.audit-tmp/requirements.txt:/tmp/requirements.txt:ro \
+                            -v $(pwd)/.audit-tmp:/audit-in:ro \
                             -v $(pwd)/${REPORT_DIR}:/reports \
                             python:3.11-slim \
                             sh -c "pip install pip-audit -q && \
-                                   pip-audit -r /tmp/requirements.txt --format json -o /reports/pip-audit.json || \
+                                   pip-audit -r /audit-in/requirements.txt --format json -o /reports/pip-audit.json || \
                                    echo '[]' > /reports/pip-audit.json" || true
                     else
                         echo '[]' > ${REPORT_DIR}/pip-audit.json
@@ -169,14 +169,15 @@ pipeline {
                     # Frontend dependency audit: extract package.json from image and run npm audit.
                     if docker image inspect utopiahire-pipeline-frontend >/dev/null 2>&1; then
                         docker run --rm utopiahire-pipeline-frontend \
-                            cat /app/package.json > .audit-tmp/package.json || true
+                            cat /app/package.json > .audit-tmp/package.json 2>/dev/null || true
                     fi
                     if [ -s .audit-tmp/package.json ]; then
                         docker run --rm \
-                            -v $(pwd)/.audit-tmp/package.json:/app/package.json:ro \
+                            -v $(pwd)/.audit-tmp:/audit-in:ro \
                             -v $(pwd)/${REPORT_DIR}:/reports \
                             node:20-alpine \
-                            sh -c "cd /app && npm audit --json > /reports/npm-audit.json 2>/dev/null || \
+                            sh -c "cp /audit-in/package.json /tmp/package.json && \
+                                   cd /tmp && npm audit --json > /reports/npm-audit.json 2>/dev/null || \
                                    echo '{}' > /reports/npm-audit.json" || true
                     else
                         echo '{}' > ${REPORT_DIR}/npm-audit.json
