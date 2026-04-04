@@ -137,6 +137,7 @@ pipeline {
                     mkdir -p ${REPORT_DIR}
                     chmod 777 ${REPORT_DIR} || true
                     mkdir -p .audit-tmp
+                          rm -rf .audit-tmp/requirements.txt .audit-tmp/package.json
 
                     # Ensure target images are available for manifest extraction.
                     if ! docker image inspect utopiahire-pipeline-backend >/dev/null 2>&1 || \
@@ -155,12 +156,12 @@ pipeline {
                     fi
                     if [ -s .audit-tmp/requirements.txt ]; then
                         docker run --rm \
-                            -v $(pwd)/.audit-tmp/requirements.txt:/tmp/requirements.txt \
+                            -v $(pwd)/.audit-tmp/requirements.txt:/tmp/requirements.txt:ro \
                             -v $(pwd)/${REPORT_DIR}:/reports \
                             python:3.11-slim \
                             sh -c "pip install pip-audit -q && \
-                                   pip-audit -r /tmp/requirements.txt --format json -o /reports/pip-audit.json || true && \
-                                   test -s /reports/pip-audit.json || echo '[]' > /reports/pip-audit.json" || true
+                                   pip-audit -r /tmp/requirements.txt --format json -o /reports/pip-audit.json || \
+                                   echo '[]' > /reports/pip-audit.json" || true
                     else
                         echo '[]' > ${REPORT_DIR}/pip-audit.json
                     fi
@@ -172,13 +173,13 @@ pipeline {
                     fi
                     if [ -s .audit-tmp/package.json ]; then
                         docker run --rm \
-                            -v $(pwd)/.audit-tmp/package.json:/app/package.json \
+                            -v $(pwd)/.audit-tmp/package.json:/app/package.json:ro \
                             -v $(pwd)/${REPORT_DIR}:/reports \
                             node:20-alpine \
-                            sh -c "cd /app && npm audit --json 2>/dev/null > /reports/npm-audit.json || true && \
-                                   test -s /reports/npm-audit.json || echo '[]' > /reports/npm-audit.json" || true
+                            sh -c "cd /app && npm audit --json > /reports/npm-audit.json 2>/dev/null || \
+                                   echo '{}' > /reports/npm-audit.json" || true
                     else
-                        echo '[]' > ${REPORT_DIR}/npm-audit.json
+                        echo '{}' > ${REPORT_DIR}/npm-audit.json
                     fi
 
                     test -f ${REPORT_DIR}/pip-audit.json || true
@@ -488,6 +489,9 @@ pipeline {
                     docker ps --filter "name=utopiahire" \
                     --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
                     echo "Local deployment confirmed"
+
+                    zip -r ${WORKSPACE}/security-report-bundle.zip \
+                        ${WORKSPACE}/security-reports/ 2>/dev/null || true
                 '''
             }
         }
@@ -496,11 +500,6 @@ pipeline {
     post {
         always {
             echo 'Bundling all security reports...'
-            sh '''
-                cd ${WORKSPACE}
-                mkdir -p security-reports
-                zip -r ${WORKSPACE}/security-report-bundle.zip ${WORKSPACE}/security-reports/ 2>/dev/null || true
-            '''
             archiveArtifacts artifacts: 'security-report-bundle.zip',
                              allowEmptyArchive: true
         }
