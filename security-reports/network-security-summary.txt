@@ -1,0 +1,17 @@
+﻿=== NETWORK SECURITY EVIDENCE SUMMARY ===
+Date: 04/04/2026 15:13:54
+
+--- Suricata IDS Evidence ---
+suricata/logs/fast.log is empty (no IDS alert lines recorded)
+suricata/logs/eve.json contains Suricata statistics only and no alert events
+
+--- iptables Firewall Evidence ---
+security-reports/iptables-evidence.txt captures the current backend iptables chain state
+security-reports/iptables-current-save.txt contains the active backend iptables-save dump
+security-reports/iptables-blocked-packets.txt confirms no blocked packets were observed in the current rule set
+security-reports/iptables-active-rules.txt contains an existing firewall rule snapshot with zero drop matches
+
+--- Security Layers Active ---
+Layer 1 (Application): ZAP DAST + Attack Simulation
+Layer 2 (Network Detection): Suricata IDS
+Layer 3 (Network Enforcement): iptables firewall

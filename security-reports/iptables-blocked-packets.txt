@@ -1,0 +1,1 @@
+No blocked packets were captured in the active backend iptables rules at the time of evidence collection.
