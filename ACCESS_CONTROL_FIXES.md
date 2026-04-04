@@ -66,4 +66,4 @@ Set one of the following backend auth configs in runtime environment:
 - `FIREBASE_CREDENTIALS_FILE` (path to service account JSON), or
 - Application Default Credentials (ADC) in your execution environment.
 
-If Firebase Admin is not configured, protected endpoints will fail closed with a service-unavailable auth error.
+If Firebase Admin is not configured, protected endpoints will fail closed with a service-unavailable auth error..
