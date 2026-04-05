@@ -17,3 +17,14 @@ alert http any any -> any 8000 (msg:"Directory Traversal Attempt"; \
 alert http any any -> any 8000 (msg:"Possible Brute Force Attack"; \
   threshold: type threshold, track by_src, count 20, seconds 10; \
   sid:1000005; rev:1;)
+
+# IDOR enumeration detection - targeting existing interview endpoint
+alert http any any -> any 8000 (msg:"IDOR Enumeration Attempt - Sequential ID scan"; \
+  content:"/api/interview/"; http_uri; \
+  threshold: type threshold, track by_src, count 10, seconds 15; \
+  sid:1000006; rev:1;)
+
+# Forced browsing detection
+alert http any any -> any 8000 (msg:"Forced Browsing Attempt - Admin Path"; \
+  content:"/admin"; nocase; http_uri; \
+  sid:1000007; rev:1;)

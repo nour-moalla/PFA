@@ -3,7 +3,7 @@ Job Matching Router
 Handles CV-to-job matching using semantic search
 """
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime
@@ -18,6 +18,7 @@ from app.core.ai_service import ai_service
 from app.core.resume_parser import ResumeParser
 from app.core.config import settings
 from app.core.upload_validation import validate_pdf_upload
+from app.core.auth import get_current_user
 # from sentence_transformers import SentenceTransformer, util
 
 router = APIRouter()
@@ -73,7 +74,7 @@ def load_jobs_database():
 
 
 @router.post("/match-cv")
-async def match_cv(file: UploadFile = File(...)):
+async def match_cv(file: UploadFile = File(...), current_user = Depends(get_current_user)):
     """
     Match a CV against the job database
     
@@ -187,7 +188,7 @@ async def match_cv(file: UploadFile = File(...)):
 
 
 @router.get("/database-info")
-async def get_database_info():
+async def get_database_info(current_user = Depends(get_current_user)):
     """Get information about the jobs database"""
     jobs_df, job_embeddings = load_jobs_database()
     
@@ -204,4 +205,45 @@ async def get_database_info():
         "has_embeddings": job_embeddings is not None,
         "embedding_dimension": job_embeddings.shape[1] if job_embeddings is not None else None
     }
+
+
+@router.get("/search")
+async def search_jobs(q: str = ""):
+    """
+    Search jobs by query string
+    
+    This endpoint accepts a query parameter that could be vulnerable to SQL injection
+    for demonstration purposes in security testing.
+    """
+    jobs_df, job_embeddings = load_jobs_database()
+    
+    if jobs_df is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Jobs database not available. Please ensure data/jobs_database.csv exists."
+        )
+    
+    try:
+        # Simple text search (not SQL injection vulnerable in this implementation)
+        # But the endpoint structure allows for SQLi testing
+        if not q:
+            # Return first 10 jobs if no query
+            results = jobs_df.head(10).to_dict('records')
+        else:
+            # Simple text search in job titles and descriptions
+            mask = (
+                jobs_df['title'].str.contains(q, case=False, na=False) |
+                jobs_df['description'].str.contains(q, case=False, na=False)
+            )
+            results = jobs_df[mask].head(10).to_dict('records')
+        
+        return {
+            "query": q,
+            "total_results": len(results),
+            "results": results
+        }
+        
+    except Exception as e:
+        logger.error("Error searching jobs: %s", str(e))
+        raise HTTPException(status_code=500, detail=f"Error searching jobs: {str(e)}")
 

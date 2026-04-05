@@ -12,7 +12,7 @@ rule-files:
   - utopiahire.rules
 
 af-packet:
-  - interface: eth0
+  - interface: lo
 
 outputs:
   - fast:

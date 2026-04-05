@@ -1,0 +1,19 @@
+﻿================================================
+   UTOPIAHIRE SQL INJECTION TEST EVIDENCE
+================================================
+Date: 04/05/2026 18:12:27
+Target: http://localhost:8000
+================================================
+
+[BLOCKED] HTTP 401 | SQLi UNION SELECT | BLOCKED by authentication
+[BLOCKED] HTTP 401 | SQLi DROP TABLE | BLOCKED by authentication
+[BLOCKED] HTTP 401 | SQLi OR bypass | BLOCKED by authentication
+[BLOCKED] HTTP 401 | SQLi Time-based | BLOCKED by authentication
+[BLOCKED] HTTP 401 | SQLi Basic bypass | BLOCKED by authentication
+[BLOCKED] HTTP 401 | SQLi Auth bypass classic | BLOCKED by authentication
+
+================================================
+TOTAL SQLi ATTACKS BLOCKED : 6
+TOTAL SQLi ATTACKS ALLOWED : 0
+SECURITY VERDICT           : ALL SQLi ATTACKS BLOCKED - SECURE
+================================================

@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
 
   jenkins:
@@ -11,6 +13,11 @@ services:
       - jenkins_data:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
+    entrypoint: >
+      bash -c "
+        chmod 666 /var/run/docker.sock &&
+        /usr/local/bin/jenkins.sh
+      "
 
   sonarqube:
     image: sonarqube:community
@@ -56,7 +63,10 @@ services:
       - ./suricata/suricata.yaml:/etc/suricata/suricata.yaml
       - ./suricata/rules:/etc/suricata/rules
       - ./suricata/logs:/var/log/suricata
-    command: -i lo --set af-packet.0.interface=lo --set default-rule-path=/etc/suricata/rules -S /etc/suricata/rules/utopiahire.rules
+    command: >
+      -i br-a6f41e7ce21a
+      -c /etc/suricata/suricata.yaml
+      -S /etc/suricata/rules/utopiahire.rules
     restart: unless-stopped
 
   dashboard:
@@ -77,3 +87,4 @@ volumes:
   sonar_data:
   sonar_logs:
   grafana_data:
+  
