@@ -104,7 +104,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('SAST — SonarQube Analysis') {
             steps {
                 echo 'Running SonarQube static security analysis...'
@@ -203,7 +203,7 @@ pipeline {
 
         stage('Build Docker Images') {
             steps {
-                echo 'Building application Docker images...'gt
+                echo 'Building application Docker images...'
                 sh '''
                     if [ "${DOCKER_AVAILABLE}" != "true" ]; then
                         echo "Docker access is unavailable on this Jenkins agent; skipping image build."
