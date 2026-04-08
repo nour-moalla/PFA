@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         SONARQUBE_URL = 'http://utopiahire-sonarqube:9000'
-        SONAR_TOKEN   = credentials('sonarqube-token')
+        SONAR_TOKEN   = credentials('SONAR-TOKEN')
         APP_BACKEND   = 'http://utopiahire-backend:8000'
         REPORT_DIR    = 'security-reports'
     }
@@ -105,7 +105,7 @@ pipeline {
             }
         }
 
-            stage('SAST — SonarQube Analysis') {
+        stage('SAST — SonarQube Analysis') {
             steps {
                 echo 'Running SonarQube static security analysis...'
 
