@@ -104,26 +104,31 @@ pipeline {
                 }
             }
         }
+        
         stage('SAST — SonarQube Analysis') {
             steps {
                 echo 'Running SonarQube static security analysis...'
-                sh '''
-                    if [ "${DOCKER_AVAILABLE}" != "true" ]; then
-                        echo "Docker access is unavailable on this Jenkins agent; skipping SonarQube analysis."
-                        exit 0
-                    fi
 
-                    docker run --rm \
-                                            --network utopiahire-main_default \
-                      -e SONAR_HOST_URL=${SONARQUBE_URL} \
-                      -e SONAR_TOKEN=${SONAR_TOKEN} \
-                      -v $(pwd):/usr/src \
-                      sonarsource/sonar-scanner-cli \
-                      -Dsonar.projectKey=utopiahire \
-                      -Dsonar.projectName=UtopiaHire \
-                      -Dsonar.sources=. \
-                      -Dsonar.exclusions=**/node_modules/**,**/.git/**,**/security-reports/** || true
-                '''
+                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+
+                    sh '''
+                        if [ "${DOCKER_AVAILABLE}" != "true" ]; then
+                            echo "Docker access is unavailable on this Jenkins agent; skipping SonarQube analysis."
+                            exit 0
+                        fi
+
+                        docker run --rm \
+                            --network utopiahire-main_default \
+                            -e SONAR_HOST_URL=${SONARQUBE_URL} \
+                            -e SONAR_TOKEN=$SONAR_TOKEN \
+                            -v $(pwd):/usr/src \
+                            sonarsource/sonar-scanner-cli \
+                            -Dsonar.projectKey=utopiahire \
+                            -Dsonar.projectName=UtopiaHire \
+                            -Dsonar.sources=backend,frontend \
+                            -Dsonar.exclusions=**/node_modules/**,**/.git/**,**/security-reports/**
+                    '''
+                }
             }
         }
 
@@ -198,7 +203,7 @@ pipeline {
 
         stage('Build Docker Images') {
             steps {
-                echo 'Building application Docker images...'
+                echo 'Building application Docker images...'gt
                 sh '''
                     if [ "${DOCKER_AVAILABLE}" != "true" ]; then
                         echo "Docker access is unavailable on this Jenkins agent; skipping image build."
