@@ -120,7 +120,7 @@ pipeline {
                     docker run --rm \
                         --network utopiahire-main_default \
                         -e SONAR_HOST_URL=${SONARQUBE_URL} \
-                        -e SONAR_TOKEN=${sonarqube-token} \
+                        -e SONAR_TOKEN=${SONAR_TOKEN} \
                         -v \$(pwd):/usr/src \
                         sonarsource/sonar-scanner-cli \
                         -Dsonar.projectKey=utopiahire \
