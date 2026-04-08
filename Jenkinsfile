@@ -109,7 +109,7 @@ pipeline {
             steps {
                 echo 'Running SonarQube static security analysis...'
 
-                withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                withCredentials([string(credentialsId: 'sonarqube-token', variable: 'SONAR_TOKEN')]) {
 
                     sh '''
                         if [ "${DOCKER_AVAILABLE}" != "true" ]; then
