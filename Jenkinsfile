@@ -138,63 +138,35 @@ pipeline {
                         echo "Docker access is unavailable on this Jenkins agent; skipping dependency audit."
                         exit 0
                     fi
-                    mkdir -p ${REPORT_DIR}
-                    chmod 777 ${REPORT_DIR} || true
-                                        mkdir -p .audit-tmp
-                                        rm -rf .audit-tmp/requirements.txt .audit-tmp/package.json
 
-                    # Ensure target images are available for manifest extraction.
-                    if ! docker image inspect utopiahire-pipeline-backend >/dev/null 2>&1 || \
-                       ! docker image inspect utopiahire-pipeline-frontend >/dev/null 2>&1; then
-                        if docker compose version >/dev/null 2>&1; then
-                            docker compose build backend frontend || true
-                        elif command -v docker-compose >/dev/null 2>&1; then
-                            docker-compose build backend frontend || true
-                        fi
-                    fi
+                    mkdir -p /var/jenkins_home/workspace/utopiahire-pipeline/security-reports
 
-                    # Backend dependency audit: extract requirements from image when repo file is unavailable.
-                    if docker image inspect utopiahire-pipeline-backend >/dev/null 2>&1; then
-                        docker run --rm utopiahire-pipeline-backend \
-                            cat /app/requirements.txt > .audit-tmp/requirements.txt 2>/dev/null || true
-                    fi
-                    if [ -s .audit-tmp/requirements.txt ]; then
-                        docker run --rm \
-                            -v $(pwd)/.audit-tmp:/audit-in:ro \
-                            -v $(pwd)/${REPORT_DIR}:/reports \
-                            python:3.11-slim \
-                            sh -c "pip install pip-audit -q && \
-                                   pip-audit -r /audit-in/requirements.txt --format json -o /reports/pip-audit.json || \
-                                   echo '[]' > /reports/pip-audit.json" || true
-                    else
-                        echo '[]' > ${REPORT_DIR}/pip-audit.json
-                    fi
+                    # Backend — pip-audit
+                    docker run --rm \
+                        -v pfa_jenkins_data:/var/jenkins_home \
+                        -w /var/jenkins_home/workspace/utopiahire-pipeline \
+                        python:3.11-slim \
+                        sh -c "pip install pip-audit -q && \
+                            pip-audit -r backend/requirements.txt --format json \
+                            -o /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/pip-audit.json || \
+                            echo '[]' > /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/pip-audit.json" || true
 
-                    # Frontend dependency audit: extract package.json from image and run npm audit.
-                    if docker image inspect utopiahire-pipeline-frontend >/dev/null 2>&1; then
-                        docker run --rm utopiahire-pipeline-frontend \
-                            cat /app/package.json > .audit-tmp/package.json 2>/dev/null || true
-                    fi
-                    if [ -s .audit-tmp/package.json ]; then
-                        docker run --rm \
-                            -v $(pwd)/.audit-tmp:/audit-in:ro \
-                            -v $(pwd)/${REPORT_DIR}:/reports \
-                            node:20-alpine \
-                            sh -c "cp /audit-in/package.json /tmp/package.json && \
-                                   cd /tmp && npm audit --json > /reports/npm-audit.json 2>/dev/null || \
-                                   echo '{}' > /reports/npm-audit.json" || true
-                    else
-                        echo '{}' > ${REPORT_DIR}/npm-audit.json
-                    fi
+                    # Frontend — npm audit
+                    docker run --rm \
+                        -v pfa_jenkins_data:/var/jenkins_home \
+                        -w /var/jenkins_home/workspace/utopiahire-pipeline/frontend \
+                        node:20-alpine \
+                        sh -c "npm audit --json > /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/npm-audit.json 2>/dev/null || \
+                            echo '{}' > /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/npm-audit.json" || true
 
-                    test -f ${REPORT_DIR}/pip-audit.json || true
-                    test -f ${REPORT_DIR}/npm-audit.json || true
+                    test -f /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/pip-audit.json || true
+                    test -f /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/npm-audit.json || true
                 '''
             }
             post {
                 always {
                     archiveArtifacts artifacts: "${REPORT_DIR}/pip-audit.json,${REPORT_DIR}/npm-audit.json",
-                                     allowEmptyArchive: true
+                                    allowEmptyArchive: true
                 }
             }
         }
@@ -272,19 +244,21 @@ pipeline {
                         exit 0
                     fi
 
+                    mkdir -p /var/jenkins_home/workspace/utopiahire-pipeline/security-reports
+
                     docker run --rm \
-                      -v $(pwd):/tf \
-                      bridgecrew/checkov:latest \
-                                            --file /tf/backend/Dockerfile \
-                                            --file /tf/frontend/Dockerfile \
-                      --output json \
-                                            --output-file-path /tf/${REPORT_DIR}/ || true
+                        -v pfa_jenkins_data:/var/jenkins_home \
+                        bridgecrew/checkov:latest \
+                        --file /var/jenkins_home/workspace/utopiahire-pipeline/backend/Dockerfile \
+                        --file /var/jenkins_home/workspace/utopiahire-pipeline/frontend/Dockerfile \
+                        --output json \
+                        --output-file-path /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/ || true
                 '''
             }
             post {
                 always {
                     archiveArtifacts artifacts: "${REPORT_DIR}/results_json.json",
-                                     allowEmptyArchive: true
+                                    allowEmptyArchive: true
                 }
             }
         }
@@ -345,18 +319,20 @@ pipeline {
                         exit 0
                     fi
 
+                    mkdir -p /var/jenkins_home/workspace/utopiahire-pipeline/security-reports
+                    chmod 777 /var/jenkins_home/workspace/utopiahire-pipeline/security-reports
+
                     echo "ZAP scanning target: http://utopiahire-backend:8000"
-                    mkdir -p $(pwd)/${REPORT_DIR}
-                    chmod 777 $(pwd)/${REPORT_DIR} || true
+
                     docker run --rm \
-                        --network utopiahire-pipeline_default \
-                        -v $(pwd)/${REPORT_DIR}:/zap/wrk:rw \
+                        --network utopiahire-main_default \
+                        -v pfa_jenkins_data:/var/jenkins_home \
                         -u root \
                         ghcr.io/zaproxy/zaproxy:stable \
                         zap-baseline.py \
                         -t http://utopiahire-backend:8000 \
-                        -r zap-report.html \
-                        -J zap-report.json \
+                        -r /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/zap-report.html \
+                        -J /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/zap-report.json \
                         -I || true
                 '''
             }
