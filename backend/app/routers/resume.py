@@ -8,7 +8,7 @@ from typing import Optional
 from pathlib import Path
 from datetime import datetime
 import os
-
+import anyio
 from app.core.resume_parser import ResumeParser
 from app.core.ai_service import ai_service
 from app.core.config import settings
@@ -47,8 +47,8 @@ async def upload_resume(
     file_id = Path(safe_name).stem
     
     try:
-        with open(save_path, "wb") as f:
-            f.write(content)
+        async with await anyio.open_file(save_path, "wb") as f:
+            await f.write(content)
         
         # Parse resume
         structured_data = resume_parser.parse(save_path)
@@ -99,8 +99,8 @@ async def analyze_resume(
     save_path = save_folder / safe_name
     
     try:
-        with open(save_path, "wb") as f:
-            f.write(content)
+        async with await anyio.open_file(save_path, "wb") as f:
+            await f.write(content)
         
         # Parse resume
         structured_data = resume_parser.parse(save_path)
@@ -153,8 +153,8 @@ async def extract_skills(file: UploadFile = File(...)):
     save_path = save_folder / safe_name
     
     try:
-        with open(save_path, "wb") as f:
-            f.write(content)
+        async with await anyio.open_file(save_path, "wb") as f:
+            await f.write(content)
         
         # Extract text
         extracted_text = resume_parser.extract_text_from_pdf(save_path)

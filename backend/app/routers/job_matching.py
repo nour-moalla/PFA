@@ -13,6 +13,7 @@ import numpy as np
 # Temporarily commented due to Python 3.13 compatibility issues
 # import torch
 import ast
+import anyio
 
 from app.core.ai_service import ai_service
 from app.core.resume_parser import ResumeParser
@@ -97,8 +98,8 @@ async def match_cv(file: UploadFile = File(...), current_user = Depends(get_curr
     save_path = save_folder / safe_name
     
     try:
-        with open(save_path, "wb") as f:
-            f.write(content)
+        async with await anyio.open_file(save_path, "wb") as f:
+            await f.write(content)
         
         # Extract text from CV
         cv_text = resume_parser.extract_text_from_pdf(save_path)
