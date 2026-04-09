@@ -119,10 +119,11 @@ pipeline {
                         -e SONAR_HOST_URL="${SONARQUBE_URL}" \
                         -e SONAR_TOKEN="${SONAR_TOKEN}" \
                         -v "$(pwd):/usr/src" \
+                        -w /usr/src \
                         sonarsource/sonar-scanner-cli \
                         -Dsonar.projectKey=utopiahire \
                         -Dsonar.projectName=UtopiaHire \
-                        -Dsonar.sources=/usr/src/backend,/usr/src/frontend \
+                        -Dsonar.sources=backend,frontend \
                         -Dsonar.exclusions=**/node_modules/**,**/.git/**,**/security-reports/** \
                         -Dsonar.scm.provider=git
                 '''
