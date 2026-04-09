@@ -123,7 +123,7 @@ pipeline {
                         sonarsource/sonar-scanner-cli \
                         -Dsonar.projectKey=utopiahire \
                         -Dsonar.projectName=UtopiaHire \
-                        -Dsonar.sources=PFA/backend,PFA/frontend \
+                        -Dsonar.sources=PFA \
                         -Dsonar.exclusions=**/node_modules/**,**/.git/**,**/security-reports/** \
                         -Dsonar.scm.provider=git
                 '''
