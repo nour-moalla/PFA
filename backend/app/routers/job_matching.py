@@ -75,7 +75,10 @@ def load_jobs_database():
 
 
 @router.post("/match-cv")
-async def match_cv(file: UploadFile = File(...), current_user = Depends(get_current_user)):
+async def match_cv(
+    file: Annotated[UploadFile, File(...)],
+    current_user: Annotated[Dict[str, Any], Depends(get_current_user)],
+):
     """
     Match a CV against the job database
     
@@ -181,6 +184,8 @@ async def match_cv(file: UploadFile = File(...), current_user = Depends(get_curr
             "total_jobs_searched": len(jobs_df)
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error matching CV: {str(e)}")
     finally:
@@ -189,7 +194,7 @@ async def match_cv(file: UploadFile = File(...), current_user = Depends(get_curr
 
 
 @router.get("/database-info")
-async def get_database_info(current_user = Depends(get_current_user)):
+async def get_database_info(current_user: Annotated[Dict[str, Any], Depends(get_current_user)]):
     """Get information about the jobs database"""
     jobs_df, job_embeddings = load_jobs_database()
     

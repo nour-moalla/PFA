@@ -31,9 +31,8 @@ RUN chmod +x /usr/local/bin/setup-firewall.sh
 EXPOSE 8000
 
 RUN addgroup --system appgroup && \
-    adduser --system --ingroup appgroup appuser
-
-RUN chown -R appuser:appgroup /app
+    adduser --system --ingroup appgroup appuser \
+    && chown -R appuser:appgroup /app
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
