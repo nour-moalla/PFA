@@ -158,9 +158,6 @@ pipeline {
                         node:20-alpine \
                         sh -c "npm audit --json > /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/npm-audit.json 2>/dev/null || \
                             echo '{}' > /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/npm-audit.json" || true
-
-                    test -f /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/pip-audit.json || true
-                    test -f /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/npm-audit.json || true
                 '''
             }
             post {
@@ -360,40 +357,40 @@ pipeline {
                     echo "=== SQL Injection Test ===" | tee security-reports/attack-results.txt
 
                     docker run --rm \
-                    --network utopiahire-pipeline_default \
-                    python:3.11-slim bash -c "
-                        pip install sqlmap >/dev/null 2>&1 &&
-                        sqlmap \
-                        -u 'http://utopiahire-backend:8000/api/jobs/database-info' \
-                        --batch \
-                        --level=1 \
-                        --ignore-code=401 \
-                        --technique=B \
-                        --flush-session
-                    " 2>&1 | tee -a security-reports/attack-results.txt || true
+                        --network utopiahire-main_default \
+                        python:3.11-slim bash -c "
+                            pip install sqlmap >/dev/null 2>&1 &&
+                            sqlmap \
+                            -u 'http://utopiahire-backend:8000/api/jobs/database-info' \
+                            --batch \
+                            --level=1 \
+                            --ignore-code=401 \
+                            --technique=B \
+                            --flush-session
+                        " 2>&1 | tee -a security-reports/attack-results.txt || true
 
                     echo "" >> security-reports/attack-results.txt
                     echo "=== XSS Filename Test ===" | tee -a security-reports/attack-results.txt
 
                     STATUS=$(docker exec utopiahire-backend \
-                    curl -s -o /dev/null -w "%{http_code}" \
-                    --max-time 10 \
-                    -X POST http://localhost:8000/api/resume/upload \
-                    -F "file=@/etc/hostname;filename=xss_test_script.pdf") \
-                    || STATUS="connection_failed"
+                        curl -s -o /dev/null -w "%{http_code}" \
+                        --max-time 10 \
+                        -X POST http://localhost:8000/api/resume/upload \
+                        -F "file=@/etc/hostname;filename=xss_test_script.pdf") \
+                        || STATUS="connection_failed"
 
                     echo "XSS filename test HTTP status: $STATUS" \
-                    | tee -a security-reports/attack-results.txt
+                        | tee -a security-reports/attack-results.txt
 
                     if [ "$STATUS" = "400" ] || [ "$STATUS" = "401" ] || [ "$STATUS" = "422" ]; then
-                    echo "RESULT: Attack correctly BLOCKED by the application" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: Attack correctly BLOCKED by the application" \
+                            | tee -a security-reports/attack-results.txt
                     elif [ "$STATUS" = "connection_failed" ]; then
-                    echo "RESULT: Could not connect to app — check HOST_IP" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: Could not connect to app — check HOST_IP" \
+                            | tee -a security-reports/attack-results.txt
                     else
-                    echo "RESULT: App returned HTTP $STATUS" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: App returned HTTP $STATUS" \
+                            | tee -a security-reports/attack-results.txt
                     fi
 
                     echo "" >> security-reports/attack-results.txt
@@ -401,52 +398,52 @@ pipeline {
 
                     BLOCKED=0
                     for i in $(seq 1 15); do
-                    S=$(docker exec utopiahire-backend \
-                        curl -s -o /dev/null -w "%{http_code}" \
-                        --max-time 5 \
-                        http://localhost:8000/health) || S="000"
-                    echo "Request $i: HTTP $S" | tee -a security-reports/attack-results.txt
-                    if [ "$S" = "429" ]; then
-                        BLOCKED=$((BLOCKED + 1))
-                    fi
+                        S=$(docker exec utopiahire-backend \
+                            curl -s -o /dev/null -w "%{http_code}" \
+                            --max-time 5 \
+                            http://localhost:8000/health) || S="000"
+                        echo "Request $i: HTTP $S" | tee -a security-reports/attack-results.txt
+                        if [ "$S" = "429" ]; then
+                            BLOCKED=$((BLOCKED + 1))
+                        fi
                     done
 
                     echo "" >> security-reports/attack-results.txt
                     echo "Rate limit blocks: $BLOCKED out of 15 requests" \
-                    | tee -a security-reports/attack-results.txt
+                        | tee -a security-reports/attack-results.txt
 
                     if [ "$BLOCKED" -gt 0 ]; then
-                    echo "RESULT: Rate limiting is WORKING correctly" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: Rate limiting is WORKING correctly" \
+                            | tee -a security-reports/attack-results.txt
                     else
-                    echo "RESULT: No rate limiting detected — review slowapi config" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: No rate limiting detected — review slowapi config" \
+                            | tee -a security-reports/attack-results.txt
                     fi
 
                     echo "" >> security-reports/attack-results.txt
                     echo "=== Directory Traversal Test ===" \
-                    | tee -a security-reports/attack-results.txt
+                        | tee -a security-reports/attack-results.txt
 
                     STATUS=$(docker exec utopiahire-backend \
-                    curl -s -o /dev/null -w "%{http_code}" \
-                    --max-time 10 \
-                    "http://localhost:8000/api/career/download/../../../etc/passwd") \
-                    || STATUS="000"
+                        curl -s -o /dev/null -w "%{http_code}" \
+                        --max-time 10 \
+                        "http://localhost:8000/api/career/download/../../../etc/passwd") \
+                        || STATUS="000"
                     echo "Directory traversal HTTP status: $STATUS" \
-                    | tee -a security-reports/attack-results.txt
+                        | tee -a security-reports/attack-results.txt
 
                     if [ "$STATUS" = "400" ] || [ "$STATUS" = "401" ] || \
                     [ "$STATUS" = "403" ] || [ "$STATUS" = "404" ]; then
-                    echo "RESULT: Directory traversal correctly BLOCKED" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: Directory traversal correctly BLOCKED" \
+                            | tee -a security-reports/attack-results.txt
                     else
-                    echo "RESULT: App returned HTTP $STATUS for traversal attempt" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: App returned HTTP $STATUS for traversal attempt" \
+                            | tee -a security-reports/attack-results.txt
                     fi
 
                     echo "" >> security-reports/attack-results.txt
                     echo "=== Attack simulation complete ===" \
-                    | tee -a security-reports/attack-results.txt
+                        | tee -a security-reports/attack-results.txt
                     echo "Full results saved to security-reports/attack-results.txt"
                 '''
             }
