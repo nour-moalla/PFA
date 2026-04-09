@@ -120,10 +120,10 @@ pipeline {
                         -e SONAR_TOKEN="${SONAR_TOKEN}" \
                         -v "$(pwd):/usr/src" \
                         -w /usr/src \
+                        -Dsonar.sources=backend,frontend \
                         sonarsource/sonar-scanner-cli \
                         -Dsonar.projectKey=utopiahire \
                         -Dsonar.projectName=UtopiaHire \
-                        -Dsonar.sources=PFA \
                         -Dsonar.exclusions=**/node_modules/**,**/.git/**,**/security-reports/** \
                         -Dsonar.scm.provider=git
                 '''
