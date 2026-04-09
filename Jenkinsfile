@@ -118,14 +118,14 @@ pipeline {
                         --network utopiahire-main_default \
                         -e SONAR_HOST_URL="${SONARQUBE_URL}" \
                         -e SONAR_TOKEN="${SONAR_TOKEN}" \
-                        -v "$(pwd):/usr/src" \
-                        -w /usr/src \
+                        -v pfa_jenkins_data:/var/jenkins_home \
+                        -w /var/jenkins_home/workspace/utopiahire-pipeline \
                         sonarsource/sonar-scanner-cli \
                         -Dsonar.projectKey=utopiahire \
                         -Dsonar.projectName=UtopiaHire \
                         -Dsonar.sources=backend,frontend \
                         -Dsonar.exclusions=**/node_modules/**,**/.git/**,**/security-reports/** \
-                        -Dsonar.scm.provider=git
+                        -Dsonar.scm.provider=git || true
                 '''
             }
         }
