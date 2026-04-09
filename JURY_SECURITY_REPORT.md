@@ -1,6 +1,7 @@
 # Security Implementation Report (For Jury)
 
 Date: 2026-04-01  
+Last Updated: 2026-04-06
 Project: UtopiaHire Career Services (FastAPI + React)
 
 ## 1. Objective
@@ -51,6 +52,7 @@ Result:
 - Dedicated DevSecOps services (Jenkins, SonarQube, Prometheus, Grafana) now run in an isolated tooling compose file.
 - Prometheus is configured to scrape backend metrics and Jenkins targets every 15 seconds.
 - Suricata IDS is integrated with custom rules for SQL injection, XSS, directory traversal, and brute-force indicators.
+- Suricata SQLi detections were validated with recorded hits in `suricata/logs/fast.log` (sid:1000001 UNION) and exported to jury evidence files.
 - Ngrok webhook tunneling enables real-time security alert forwarding to external monitoring systems.
 - Jenkins now runs a full staged security pipeline with credential-to-`.env` injection, containerized scanners, DAST, attack simulation, and report artifact bundling.
 - A separate `dashboard/` application now includes a runnable Streamlit control center (`dashboard/app.py`) with Dev/Sec/Ops monitoring and control actions.
@@ -423,6 +425,27 @@ Impact:
 
 ---
 
+### R) SQL Injection Detection Evidence Validation (Post-Implementation Update)
+Problem:
+- Initial SQLi replay attempts did not produce expected Suricata alerts because test traffic path and capture interface were misaligned.
+- Evidence export file for SQLi detections became stale/empty in workspace state.
+
+Fix:
+- Revalidated Suricata runtime and custom rule loading (5/5 signatures loaded).
+- Replayed SQLi payload traffic and refreshed evidence exports from current `fast.log`.
+- Regenerated SQLi evidence files under jury evidence directories.
+
+Validated Evidence Snapshot (latest refresh):
+- Total Suricata alerts in `suricata/logs/fast.log`: 8
+- SQLi detections: 2 (`sid:1000001` - SQL Injection Attempt - UNION)
+- Brute-force detections: 6 (`sid:1000005`)
+
+Current firewall snapshot note:
+- `security-reports/iptables-evidence.txt` currently shows INPUT policy `ACCEPT` in the latest capture.
+- Re-apply firewall script before final jury demo if strict DROP-policy evidence is required.
+
+---
+
 ## 4. Files Added / Modified
 
 ### Added
@@ -450,6 +473,10 @@ Impact:
   - iptables firewall rules script for OS-level network enforcement.
 - `security-reports/iptables-active-rules.txt`
   - Saved iptables rules for jury evidence.
+- `jury-evidence/network-security/suricata-option2-validation.txt`
+  - Refreshed Suricata detection count summary (SQLi + brute-force).
+- `jury-evidence/network-security/suricata-sqli-detections.txt`
+  - Exported SQL Injection alert lines from Suricata `fast.log`.
 - `JURY_SECURITY_REPORT.md`
   - This report.
 
@@ -500,6 +527,7 @@ Impact:
   - Added NET_ADMIN and NET_RAW capabilities to backend container for iptables functionality.
 - `docker-compose.devops.yml`
   - Added `dashboard` service (`utopiahire-dashboard`) with build, port mapping, mounts, env var wiring, and restart policy.
+  - Updated Suricata runtime command/interface settings during IDS evidence validation.
 - `.github/workflows/deploy.yml`
   - Replaced unpinned `@master` action refs with pinned stable versions.
 - `dashboard/pages/`
@@ -543,15 +571,20 @@ Behavior:
 - DevSecOps compose stack successfully started with all 5 containers running (including Suricata).
 - Prometheus configuration file loaded from `monitoring/prometheus.yml`.
 - Suricata container started with mounted rules/logs directories and custom rule file.
+- Suricata alert log (`suricata/logs/fast.log`) contains validated detections:
+  - `sid:1000001` SQL Injection Attempt - UNION (2 alerts)
+  - `sid:1000005` Possible Brute Force Attack (6 alerts)
+- SQLi-only export refreshed at `jury-evidence/network-security/suricata-sqli-detections.txt` (2 lines).
+- Suricata validation snapshot refreshed at `jury-evidence/network-security/suricata-option2-validation.txt`.
 - Ngrok webhook tunneling configured for external security alert forwarding.
 - Jenkinsfile includes credential-driven `.env` generation and containerized security scanner execution.
 - Jenkins attack simulation stage validates SQLi, XSS upload behavior, rate-limit enforcement, and traversal blocking.
 - Dashboard app entrypoint exists at `dashboard/app.py` with Dev/Sec/Ops tabs and container/service controls.
 - Dashboard Dockerfile exists and exposes Streamlit on port 8501 with headless bind to `0.0.0.0`.
 - DevSecOps compose file includes a `dashboard` service that starts with tooling stack and maps host port `8501`.
-- iptables firewall rules are active in backend container with DROP default policy.
-- Port 8000 responds normally while unauthorized ports are blocked.
-- iptables rules saved to `security-reports/iptables-active-rules.txt` with packet counters increasing.
+- iptables evidence snapshot exported to `security-reports/iptables-evidence.txt` for jury review.
+- Latest snapshot currently shows INPUT policy `ACCEPT`; re-apply firewall script before final demo if DROP-policy evidence is required.
+- iptables rules are also archived in `security-reports/iptables-active-rules.txt` for baseline comparison.
 - FastAPI `/metrics` endpoint exposes Prometheus-formatted metrics with HTTP request counters and response times.
 - Grafana dashboard displays 4 panels showing real-time backend metrics (request rates, response times, error rates, and system performance).
 
@@ -611,13 +644,15 @@ Security outcomes achieved:
 22. Run `streamlit run dashboard/app.py` -> confirm Dev/Sec/Ops tabs load and container status panel is visible.
 23. Open `dashboard/Dockerfile` -> verify Streamlit CMD binds to `0.0.0.0:8501` in headless mode.
 24. Run `docker compose -f docker-compose.devops.yml up -d dashboard` -> confirm `utopiahire-dashboard` is running and reachable at `http://localhost:8501`.
-25. Run `docker exec utopiahire-backend iptables -L INPUT -n -v` -> confirm firewall rules are active with DROP default policy.
-26. Test `curl http://localhost:8000/health` -> should return HTTP 200 (port allowed).
-27. Test `curl http://localhost:22` -> should fail/timeout (port blocked by iptables).
+25. Run `docker exec utopiahire-backend iptables -L INPUT -n -v` -> confirm current firewall policy and counters from live container state.
+26. If firewall script is applied, test `curl http://localhost:8000/health` -> should return HTTP 200 (allowed service port).
+27. If firewall script is applied, test `curl http://localhost:22` -> should fail/timeout (blocked unauthorized port).
 28. Check `security-reports/iptables-active-rules.txt` -> verify rules are saved with packet counters.
 29. Open `http://localhost:8000/metrics` in browser -> should show Prometheus metrics with `http_requests_total` counters.
 30. Open `http://localhost:3001` (Grafana) -> login with admin/admin123, verify 4 panels show backend metrics updating in real-time.
+31. Open `suricata/logs/fast.log` -> verify SQLi detection entries exist for `sid:1000001` and brute-force entries for `sid:1000005`.
+32. Open `jury-evidence/network-security/suricata-sqli-detections.txt` -> verify SQL Injection detections are exported for jury evidence.
+33. Open `jury-evidence/network-security/suricata-option2-validation.txt` -> verify latest counts (total alerts, SQLi alerts, brute-force alerts).
+34. Open `security-reports/iptables-evidence.txt` -> verify current INPUT policy snapshot and, if needed, re-apply firewall script before demo for DROP-policy evidence.
 
 These scenarios demonstrate that access control and abuse protections are active and effective.
-
-test22222

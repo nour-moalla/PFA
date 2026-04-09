@@ -1,0 +1,4 @@
+﻿Suricata evidence refresh date: 2026-04-06 19:54:26
+Total alerts: 8
+SQLi alerts: 2
+Brute-force alerts: 6

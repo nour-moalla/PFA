@@ -15,7 +15,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt --default-timeout=600 --retries=10
+RUN pip install --no-cache-dir -r requirements.txt \
+    --default-timeout=600 \
+    --retries=10 \
+    --extra-index-url https://download.pytorch.org/whl/cpu
 
 # Copy backend code
 COPY . .

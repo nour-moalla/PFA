@@ -19,7 +19,8 @@ numpy>=1.26.0
 
 # Embeddings and ML (pre-built wheels for Python 3.13)
 sentence-transformers>=2.7.0
-torch>=2.2.0
+torch==2.5.1+cpu ; platform_system == "Linux"
+torch>=2.2.0 ; platform_system == "Windows"
 scikit-learn>=1.5.0
 
 # Environment

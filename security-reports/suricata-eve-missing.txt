@@ -1,0 +1,1 @@
+﻿eve.json not found in utopiahire-suricata:/var/log/suricata at collection time.

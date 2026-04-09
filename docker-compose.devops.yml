@@ -3,7 +3,9 @@ version: '3.8'
 services:
 
   jenkins:
-    image: jenkins/jenkins:lts
+    build:
+      context: .
+      dockerfile: Dockerfile.jenkins
     container_name: jenkins
     user: root
     ports:
@@ -13,11 +15,9 @@ services:
       - jenkins_data:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
-    entrypoint: >
-      bash -c "
-        chmod 666 /var/run/docker.sock &&
-        /usr/local/bin/jenkins.sh
-      "
+    entrypoint: ["/bin/bash", "-c", "chmod 666 /var/run/docker.sock && /usr/local/bin/jenkins.sh"]
+    networks:
+      - utopia_net
 
   sonarqube:
     image: sonarqube:community
@@ -30,6 +30,8 @@ services:
     environment:
       - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
     restart: unless-stopped
+    networks:
+      - utopia_net
 
   prometheus:
     image: prom/prometheus:latest
@@ -39,6 +41,8 @@ services:
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
     restart: unless-stopped
+    networks:
+      - utopia_net
 
   grafana:
     image: grafana/grafana:latest
@@ -50,6 +54,8 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin123
     restart: unless-stopped
+    networks:
+      - utopia_net
 
   suricata:
     image: jasonish/suricata:latest
@@ -64,7 +70,7 @@ services:
       - ./suricata/rules:/etc/suricata/rules
       - ./suricata/logs:/var/log/suricata
     command: >
-      -i br-a6f41e7ce21a
+      -i br-79015fa2c51d
       -c /etc/suricata/suricata.yaml
       -S /etc/suricata/rules/utopiahire.rules
     restart: unless-stopped
@@ -81,10 +87,16 @@ services:
     environment:
       - OPENAI_API_KEY=${AI_API_KEY}
     restart: unless-stopped
+    networks:
+      - utopia_net
 
 volumes:
   jenkins_data:
   sonar_data:
   sonar_logs:
   grafana_data:
-  
+
+networks:
+  utopia_net:
+    external: true
+    name: utopiahire-main_default

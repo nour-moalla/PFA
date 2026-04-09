@@ -10,6 +10,8 @@ services:
       - "8000:8000"
     env_file:
       - ./backend/.env
+    networks:
+      - utopia_net
 
   frontend:
     build: ./frontend
@@ -20,3 +22,10 @@ services:
       - ./frontend/.env
     healthcheck:
       disable: true
+    networks:
+      - utopia_net
+
+networks:
+  utopia_net:
+    external: true
+    name: utopiahire-main_default
