@@ -109,7 +109,7 @@ pipeline {
             steps {
                 echo 'Running SonarQube static security analysis...'
 
-                withCredentials([string(credentialsId: 'SONAR_TOKEN_ID', variable: 'SONAR_TOKEN')]) {
+                withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
                     sh """
                         if [ "\${DOCKER_AVAILABLE}" != "true" ]; then
                             echo "Docker access is unavailable on this Jenkins agent; skipping SonarQube analysis."
