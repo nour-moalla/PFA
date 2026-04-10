@@ -9,11 +9,12 @@ from pathlib import Path
 import logging
 import pandas as pd
 import numpy as np
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Annotated
 import json
 from fpdf import FPDF
 import os
 import time
+import anyio
 
 from app.core.ai_service import ai_service
 from app.core.resume_parser import ResumeParser
@@ -73,7 +74,7 @@ async def get_market_insights():
 
 
 @router.post("/upload-cv")
-async def upload_cv_for_insights(file: UploadFile = File(...)):
+async def upload_cv_for_insights(file: Annotated[UploadFile, File(...)]):
     """
     Upload CV for career insights analysis
     
@@ -88,8 +89,8 @@ async def upload_cv_for_insights(file: UploadFile = File(...)):
     file_id = Path(safe_name).stem
     
     try:
-        with open(save_path, "wb") as f:
-            f.write(content)
+        async with await anyio.open_file(save_path, "wb") as f:
+            await f.write(content)
 
         # Extract text from CV
         cv_text = resume_parser.extract_text_from_pdf(save_path)

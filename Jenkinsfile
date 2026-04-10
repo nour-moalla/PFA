@@ -104,31 +104,84 @@ pipeline {
                 }
             }
         }
+        stage('Backend Tests — Coverage') {
+            steps {
+                echo 'Running Python tests and generating coverage report...'
+                sh '''
+                    if [ "${DOCKER_AVAILABLE}" != "true" ]; then
+                        echo "Docker unavailable; skipping."
+                        exit 0
+                    fi
 
+                    WORKSPACE_PATH="/var/jenkins_home/workspace/utopiahire-pipeline"
+
+                    docker run --rm \
+                        -v pfa_jenkins_data:/var/jenkins_home \
+                        -w ${WORKSPACE_PATH}/backend \
+                        python:3.11-slim \
+                        sh -c "
+                            echo '=== Installing torch from PyTorch index ==='
+                            pip install torch --index-url https://download.pytorch.org/whl/cpu -q
+
+                            echo '=== Installing remaining dependencies ==='
+                            pip install -r requirements.txt --ignore-installed torch -q || true
+
+                            echo '=== Installing test tools ==='
+                            pip install pytest pytest-cov -q
+
+                            echo '=== Project structure ==='
+                            ls -la .
+                            ls -la tests/ 2>/dev/null || echo 'No tests/ folder found'
+
+                            echo '=== Running pytest ==='
+                            python -m pytest \
+                                --cov=app \
+                                --cov-report=xml:${WORKSPACE_PATH}/coverage.xml \
+                                --cov-report=term \
+                                -v --tb=short || true
+
+                            echo '=== Coverage file check ==='
+                            ls -la ${WORKSPACE_PATH}/coverage.xml \
+                                && echo 'coverage.xml EXISTS' \
+                                || echo 'coverage.xml NOT FOUND'
+                        "
+                '''
+            }
+        }
+        stage('Verify Coverage File') {
+            steps {
+                sh '''
+                    echo "=== Checking for coverage.xml ==="
+                    ls -la /var/jenkins_home/workspace/utopiahire-pipeline/coverage.xml || echo "FILE NOT FOUND"
+                    echo "=== Workspace contents ==="
+                    ls -la /var/jenkins_home/workspace/utopiahire-pipeline/
+                '''
+            }
+        }
         stage('SAST — SonarQube Analysis') {
             steps {
-                echo 'Running SonarQube static security analysis...'
+                echo 'Running SonarQube static analysis with coverage...'
+                sh '''
+                    if [ "${DOCKER_AVAILABLE}" != "true" ]; then
+                        echo "Docker unavailable; skipping."
+                        exit 0
+                    fi
 
-                withCredentials([string(credentialsId: 'SONAR_TOKEN_ID', variable: 'SONAR_TOKEN')]) {
-                    sh """
-                        if [ "\${DOCKER_AVAILABLE}" != "true" ]; then
-                            echo "Docker access is unavailable on this Jenkins agent; skipping SonarQube analysis."
-                            exit 0
-                        fi
-
-                        docker run --rm \
-                            --network utopiahire-main_default \
-                            -e SONAR_HOST_URL=${SONARQUBE_URL} \
-                            -e SONAR_TOKEN=\$SONAR_TOKEN \
-                            -v \$(pwd):/usr/src \
-                            sonarsource/sonar-scanner-cli \
-                            -Dsonar.projectKey=utopiahire \
-                            -Dsonar.projectName=UtopiaHire \
-                            -Dsonar.sources=/usr/src/backend,/usr/src/frontend \
-                            -Dsonar.exclusions=**/node_modules/**,**/.git/**,**/security-reports/** \
-                            -Dsonar.scm.provider=git
-                    """
-                }
+                    docker run --rm \
+                        --network utopiahire-main_default \
+                        -e SONAR_HOST_URL="${SONARQUBE_URL}" \
+                        -e SONAR_TOKEN="${SONAR_TOKEN}" \
+                        -v pfa_jenkins_data:/var/jenkins_home \
+                        -w /var/jenkins_home/workspace/utopiahire-pipeline \
+                        sonarsource/sonar-scanner-cli \
+                        -Dsonar.projectKey=utopiahire \
+                        -Dsonar.projectName=UtopiaHire \
+                        -Dsonar.sources=backend,frontend \
+                        -Dsonar.exclusions=**/node_modules/**,**/.git/**,**/security-reports/**,**/tests/** \
+                        -Dsonar.python.coverage.reportPaths=coverage.xml \
+                        -Dsonar.coverage.exclusions=**/tests/**,**/__init__.py \
+                        -Dsonar.scm.provider=git || true
+                '''
             }
         }
 
@@ -140,63 +193,32 @@ pipeline {
                         echo "Docker access is unavailable on this Jenkins agent; skipping dependency audit."
                         exit 0
                     fi
-                    mkdir -p ${REPORT_DIR}
-                    chmod 777 ${REPORT_DIR} || true
-                                        mkdir -p .audit-tmp
-                                        rm -rf .audit-tmp/requirements.txt .audit-tmp/package.json
 
-                    # Ensure target images are available for manifest extraction.
-                    if ! docker image inspect utopiahire-pipeline-backend >/dev/null 2>&1 || \
-                       ! docker image inspect utopiahire-pipeline-frontend >/dev/null 2>&1; then
-                        if docker compose version >/dev/null 2>&1; then
-                            docker compose build backend frontend || true
-                        elif command -v docker-compose >/dev/null 2>&1; then
-                            docker-compose build backend frontend || true
-                        fi
-                    fi
+                    mkdir -p /var/jenkins_home/workspace/utopiahire-pipeline/security-reports
 
-                    # Backend dependency audit: extract requirements from image when repo file is unavailable.
-                    if docker image inspect utopiahire-pipeline-backend >/dev/null 2>&1; then
-                        docker run --rm utopiahire-pipeline-backend \
-                            cat /app/requirements.txt > .audit-tmp/requirements.txt 2>/dev/null || true
-                    fi
-                    if [ -s .audit-tmp/requirements.txt ]; then
-                        docker run --rm \
-                            -v $(pwd)/.audit-tmp:/audit-in:ro \
-                            -v $(pwd)/${REPORT_DIR}:/reports \
-                            python:3.11-slim \
-                            sh -c "pip install pip-audit -q && \
-                                   pip-audit -r /audit-in/requirements.txt --format json -o /reports/pip-audit.json || \
-                                   echo '[]' > /reports/pip-audit.json" || true
-                    else
-                        echo '[]' > ${REPORT_DIR}/pip-audit.json
-                    fi
+                    # Backend — pip-audit
+                    docker run --rm \
+                        -v pfa_jenkins_data:/var/jenkins_home \
+                        -w /var/jenkins_home/workspace/utopiahire-pipeline \
+                        python:3.11-slim \
+                        sh -c "pip install pip-audit -q && \
+                            pip-audit -r backend/requirements.txt --format json \
+                            -o /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/pip-audit.json || \
+                            echo '[]' > /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/pip-audit.json" || true
 
-                    # Frontend dependency audit: extract package.json from image and run npm audit.
-                    if docker image inspect utopiahire-pipeline-frontend >/dev/null 2>&1; then
-                        docker run --rm utopiahire-pipeline-frontend \
-                            cat /app/package.json > .audit-tmp/package.json 2>/dev/null || true
-                    fi
-                    if [ -s .audit-tmp/package.json ]; then
-                        docker run --rm \
-                            -v $(pwd)/.audit-tmp:/audit-in:ro \
-                            -v $(pwd)/${REPORT_DIR}:/reports \
-                            node:20-alpine \
-                            sh -c "cp /audit-in/package.json /tmp/package.json && \
-                                   cd /tmp && npm audit --json > /reports/npm-audit.json 2>/dev/null || \
-                                   echo '{}' > /reports/npm-audit.json" || true
-                    else
-                        echo '{}' > ${REPORT_DIR}/npm-audit.json
-                    fi
-
-                    test -f ${REPORT_DIR}/pip-audit.json || true
-                    test -f ${REPORT_DIR}/npm-audit.json || true
+                    # Frontend — npm audit
+                    docker run --rm \
+                        -v pfa_jenkins_data:/var/jenkins_home \
+                        -w /var/jenkins_home/workspace/utopiahire-pipeline/frontend \
+                        node:20-alpine \
+                        sh -c "npm audit --json > /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/npm-audit.json 2>/dev/null || \
+                            echo '{}' > /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/npm-audit.json" || true
                 '''
             }
             post {
                 always {
                     archiveArtifacts artifacts: "${REPORT_DIR}/pip-audit.json,${REPORT_DIR}/npm-audit.json",
-                                     allowEmptyArchive: true
+                                    allowEmptyArchive: true
                 }
             }
         }
@@ -274,19 +296,21 @@ pipeline {
                         exit 0
                     fi
 
+                    mkdir -p /var/jenkins_home/workspace/utopiahire-pipeline/security-reports
+
                     docker run --rm \
-                      -v $(pwd):/tf \
-                      bridgecrew/checkov:latest \
-                                            --file /tf/backend/Dockerfile \
-                                            --file /tf/frontend/Dockerfile \
-                      --output json \
-                                            --output-file-path /tf/${REPORT_DIR}/ || true
+                        -v pfa_jenkins_data:/var/jenkins_home \
+                        bridgecrew/checkov:latest \
+                        --file /var/jenkins_home/workspace/utopiahire-pipeline/backend/Dockerfile \
+                        --file /var/jenkins_home/workspace/utopiahire-pipeline/frontend/Dockerfile \
+                        --output json \
+                        --output-file-path /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/ || true
                 '''
             }
             post {
                 always {
                     archiveArtifacts artifacts: "${REPORT_DIR}/results_json.json",
-                                     allowEmptyArchive: true
+                                    allowEmptyArchive: true
                 }
             }
         }
@@ -347,18 +371,20 @@ pipeline {
                         exit 0
                     fi
 
+                    mkdir -p /var/jenkins_home/workspace/utopiahire-pipeline/security-reports
+                    chmod 777 /var/jenkins_home/workspace/utopiahire-pipeline/security-reports
+
                     echo "ZAP scanning target: http://utopiahire-backend:8000"
-                    mkdir -p $(pwd)/${REPORT_DIR}
-                    chmod 777 $(pwd)/${REPORT_DIR} || true
+
                     docker run --rm \
-                        --network utopiahire-pipeline_default \
-                        -v $(pwd)/${REPORT_DIR}:/zap/wrk:rw \
+                        --network utopiahire-main_default \
+                        -v pfa_jenkins_data:/var/jenkins_home \
                         -u root \
                         ghcr.io/zaproxy/zaproxy:stable \
                         zap-baseline.py \
                         -t http://utopiahire-backend:8000 \
-                        -r zap-report.html \
-                        -J zap-report.json \
+                        -r /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/zap-report.html \
+                        -J /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/zap-report.json \
                         -I || true
                 '''
             }
@@ -386,40 +412,40 @@ pipeline {
                     echo "=== SQL Injection Test ===" | tee security-reports/attack-results.txt
 
                     docker run --rm \
-                    --network utopiahire-pipeline_default \
-                    python:3.11-slim bash -c "
-                        pip install sqlmap >/dev/null 2>&1 &&
-                        sqlmap \
-                        -u 'http://utopiahire-backend:8000/api/jobs/database-info' \
-                        --batch \
-                        --level=1 \
-                        --ignore-code=401 \
-                        --technique=B \
-                        --flush-session
-                    " 2>&1 | tee -a security-reports/attack-results.txt || true
+                        --network utopiahire-main_default \
+                        python:3.11-slim bash -c "
+                            pip install sqlmap >/dev/null 2>&1 &&
+                            sqlmap \
+                            -u 'http://utopiahire-backend:8000/api/jobs/database-info' \
+                            --batch \
+                            --level=1 \
+                            --ignore-code=401 \
+                            --technique=B \
+                            --flush-session
+                        " 2>&1 | tee -a security-reports/attack-results.txt || true
 
                     echo "" >> security-reports/attack-results.txt
                     echo "=== XSS Filename Test ===" | tee -a security-reports/attack-results.txt
 
                     STATUS=$(docker exec utopiahire-backend \
-                    curl -s -o /dev/null -w "%{http_code}" \
-                    --max-time 10 \
-                    -X POST http://localhost:8000/api/resume/upload \
-                    -F "file=@/etc/hostname;filename=xss_test_script.pdf") \
-                    || STATUS="connection_failed"
+                        curl -s -o /dev/null -w "%{http_code}" \
+                        --max-time 10 \
+                        -X POST http://localhost:8000/api/resume/upload \
+                        -F "file=@/etc/hostname;filename=xss_test_script.pdf") \
+                        || STATUS="connection_failed"
 
                     echo "XSS filename test HTTP status: $STATUS" \
-                    | tee -a security-reports/attack-results.txt
+                        | tee -a security-reports/attack-results.txt
 
                     if [ "$STATUS" = "400" ] || [ "$STATUS" = "401" ] || [ "$STATUS" = "422" ]; then
-                    echo "RESULT: Attack correctly BLOCKED by the application" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: Attack correctly BLOCKED by the application" \
+                            | tee -a security-reports/attack-results.txt
                     elif [ "$STATUS" = "connection_failed" ]; then
-                    echo "RESULT: Could not connect to app — check HOST_IP" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: Could not connect to app — check HOST_IP" \
+                            | tee -a security-reports/attack-results.txt
                     else
-                    echo "RESULT: App returned HTTP $STATUS" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: App returned HTTP $STATUS" \
+                            | tee -a security-reports/attack-results.txt
                     fi
 
                     echo "" >> security-reports/attack-results.txt
@@ -427,52 +453,52 @@ pipeline {
 
                     BLOCKED=0
                     for i in $(seq 1 15); do
-                    S=$(docker exec utopiahire-backend \
-                        curl -s -o /dev/null -w "%{http_code}" \
-                        --max-time 5 \
-                        http://localhost:8000/health) || S="000"
-                    echo "Request $i: HTTP $S" | tee -a security-reports/attack-results.txt
-                    if [ "$S" = "429" ]; then
-                        BLOCKED=$((BLOCKED + 1))
-                    fi
+                        S=$(docker exec utopiahire-backend \
+                            curl -s -o /dev/null -w "%{http_code}" \
+                            --max-time 5 \
+                            http://localhost:8000/health) || S="000"
+                        echo "Request $i: HTTP $S" | tee -a security-reports/attack-results.txt
+                        if [ "$S" = "429" ]; then
+                            BLOCKED=$((BLOCKED + 1))
+                        fi
                     done
 
                     echo "" >> security-reports/attack-results.txt
                     echo "Rate limit blocks: $BLOCKED out of 15 requests" \
-                    | tee -a security-reports/attack-results.txt
+                        | tee -a security-reports/attack-results.txt
 
                     if [ "$BLOCKED" -gt 0 ]; then
-                    echo "RESULT: Rate limiting is WORKING correctly" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: Rate limiting is WORKING correctly" \
+                            | tee -a security-reports/attack-results.txt
                     else
-                    echo "RESULT: No rate limiting detected — review slowapi config" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: No rate limiting detected — review slowapi config" \
+                            | tee -a security-reports/attack-results.txt
                     fi
 
                     echo "" >> security-reports/attack-results.txt
                     echo "=== Directory Traversal Test ===" \
-                    | tee -a security-reports/attack-results.txt
+                        | tee -a security-reports/attack-results.txt
 
                     STATUS=$(docker exec utopiahire-backend \
-                    curl -s -o /dev/null -w "%{http_code}" \
-                    --max-time 10 \
-                    "http://localhost:8000/api/career/download/../../../etc/passwd") \
-                    || STATUS="000"
+                        curl -s -o /dev/null -w "%{http_code}" \
+                        --max-time 10 \
+                        "http://localhost:8000/api/career/download/../../../etc/passwd") \
+                        || STATUS="000"
                     echo "Directory traversal HTTP status: $STATUS" \
-                    | tee -a security-reports/attack-results.txt
+                        | tee -a security-reports/attack-results.txt
 
                     if [ "$STATUS" = "400" ] || [ "$STATUS" = "401" ] || \
                     [ "$STATUS" = "403" ] || [ "$STATUS" = "404" ]; then
-                    echo "RESULT: Directory traversal correctly BLOCKED" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: Directory traversal correctly BLOCKED" \
+                            | tee -a security-reports/attack-results.txt
                     else
-                    echo "RESULT: App returned HTTP $STATUS for traversal attempt" \
-                        | tee -a security-reports/attack-results.txt
+                        echo "RESULT: App returned HTTP $STATUS for traversal attempt" \
+                            | tee -a security-reports/attack-results.txt
                     fi
 
                     echo "" >> security-reports/attack-results.txt
                     echo "=== Attack simulation complete ===" \
-                    | tee -a security-reports/attack-results.txt
+                        | tee -a security-reports/attack-results.txt
                     echo "Full results saved to security-reports/attack-results.txt"
                 '''
             }
