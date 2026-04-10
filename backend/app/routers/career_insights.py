@@ -9,7 +9,7 @@ from pathlib import Path
 import logging
 import pandas as pd
 import numpy as np
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Annotated
 import json
 from fpdf import FPDF
 import os
@@ -74,7 +74,7 @@ async def get_market_insights():
 
 
 @router.post("/upload-cv")
-async def upload_cv_for_insights(file: UploadFile = File(...)):
+async def upload_cv_for_insights(file: Annotated[UploadFile, File(...)]):
     """
     Upload CV for career insights analysis
     

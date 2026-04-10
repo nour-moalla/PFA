@@ -4,7 +4,7 @@ Handles resume/CV upload, parsing, and ATS analysis
 """
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Request
-from typing import Optional
+from typing import Optional, Annotated
 from pathlib import Path
 from datetime import datetime
 import os
@@ -23,11 +23,11 @@ resume_parser = ResumeParser()
 
 @router.post("/upload")
 async def upload_resume(
-    file: UploadFile = File(...),
-    job_description: Optional[str] = Form(None),
-    job_title: Optional[str] = Form(None),
-    company: Optional[str] = Form(None),
-    experience: Optional[int] = Form(None)
+    file: Annotated[UploadFile, File(...)],
+    job_description: Annotated[Optional[str], Form(None)] = None,
+    job_title: Annotated[Optional[str], Form(None)] = None,
+    company: Annotated[Optional[str], Form(None)] = None,
+    experience: Annotated[Optional[int], Form(None)] = None
 ):
     """
     Upload and parse a resume/CV
@@ -74,11 +74,11 @@ async def upload_resume(
 @limiter.limit("10/minute")
 async def analyze_resume(
     request: Request,
-    file: UploadFile = File(...),
-    job_description: Optional[str] = Form(None),
-    job_title: Optional[str] = Form(None),
-    company: Optional[str] = Form(None),
-    experience: Optional[int] = Form(None)
+    file: Annotated[UploadFile, File(...)],
+    job_description: Annotated[Optional[str], Form(None)] = None,
+    job_title: Annotated[Optional[str], Form(None)] = None,
+    company: Annotated[Optional[str], Form(None)] = None,
+    experience: Annotated[Optional[int], Form(None)] = None
 ):
     """
     Analyze resume with ATS scoring and detailed feedback
@@ -139,7 +139,7 @@ async def analyze_resume(
 
 
 @router.post("/extract-skills")
-async def extract_skills(file: UploadFile = File(...)):
+async def extract_skills(file: Annotated[UploadFile, File(...)]):
     """
     Extract technical skills from a resume
     
