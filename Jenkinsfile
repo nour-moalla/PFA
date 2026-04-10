@@ -104,7 +104,37 @@ pipeline {
                 }
             }
         }
+        stage('Backend Tests — Coverage') {
+            steps {
+                echo 'Running Python tests with coverage report...'
+                sh '''
+                    if [ "${DOCKER_AVAILABLE}" != "true" ]; then
+                        echo "Docker unavailable; skipping tests."
+                        exit 0
+                    fi
 
+                    docker run --rm \
+                        --network utopiahire-main_default \
+                        -v pfa_jenkins_data:/var/jenkins_home \
+                        -w /var/jenkins_home/workspace/utopiahire-pipeline/backend \
+                        python:3.11-slim \
+                        sh -c "
+                            pip install -r requirements.txt -q &&
+                            pip install pytest pytest-cov -q &&
+                            pytest tests/ \
+                                --cov=app \
+                                --cov-report=xml:/var/jenkins_home/workspace/utopiahire-pipeline/coverage.xml \
+                                --cov-report=term \
+                                -v || true
+                        "
+                '''
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'coverage.xml', allowEmptyArchive: true
+                }
+            }
+        }
         stage('SAST — SonarQube Analysis') {
             steps {
                 echo 'Running SonarQube static security analysis...'
@@ -124,7 +154,9 @@ pipeline {
                         -Dsonar.projectKey=utopiahire \
                         -Dsonar.projectName=UtopiaHire \
                         -Dsonar.sources=backend,frontend \
-                        -Dsonar.exclusions=**/node_modules/**,**/.git/**,**/security-reports/** \
+                        -Dsonar.exclusions=**/node_modules/**,**/.git/**,**/security-reports/**,**/tests/** \
+                        -Dsonar.python.coverage.reportPaths=coverage.xml \
+                        -Dsonar.coverage.exclusions=**/tests/**,**/__init__.py \
                         -Dsonar.scm.provider=git || true
                 '''
             }
