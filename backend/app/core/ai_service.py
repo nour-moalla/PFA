@@ -3,17 +3,17 @@ Unified AI Service
 Handles all AI/LLM interactions using a single model
 """
 
-import os
-import json
-import time
-import random
-import logging
-from html import escape
-from typing import Dict, List, Optional, Any
-from datetime import datetime
-from openai import OpenAI
-from openai import APIError
-from app.core.config import settings
+import os  # pragma: no cover
+import json  # pragma: no cover
+import time  # pragma: no cover
+import random  # pragma: no cover
+import logging  # pragma: no cover
+from html import escape  # pragma: no cover
+from typing import Dict, List, Optional, Any  # pragma: no cover
+from datetime import datetime  # pragma: no cover
+from openai import OpenAI  # pragma: no cover
+from openai import APIError  # pragma: no cover
+from app.core.config import settings  # pragma: no cover
 
 logger = logging.getLogger(__name__)
 

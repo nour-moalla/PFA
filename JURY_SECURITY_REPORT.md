@@ -1,7 +1,7 @@
 # Security Implementation Report (For Jury)
 
 Date: 2026-04-01  
-Last Updated: 2026-04-06
+Last Updated: 2026-04-10
 Project: UtopiaHire Career Services (FastAPI + React)
 
 ## 1. Objective
@@ -616,6 +616,98 @@ Security outcomes achieved:
 - OS-level network enforcement via iptables firewall rules blocking unauthorized traffic at kernel level
 - Application performance monitoring via Prometheus metrics endpoint with request/response tracking
 - Real-time metrics visualization through Grafana dashboards showing request rates, response times, and error rates
+
+---
+
+## 8. Post-Audit Vulnerability Register Update (2026-04-10)
+
+This section records additional validated findings from a full codebase review. It includes vulnerabilities that are still present and vulnerabilities that previously existed but were already fixed.
+
+### 8.1 Still Present
+
+1. Hardcoded AI key in backend environment file
+- Evidence: `backend/.env` line 1
+- Class: `secret_exposure`
+- Status: **Present**
+- Severity: **High** (CVSS estimate: 8.2)
+
+2. Hardcoded Grafana admin password in DevSecOps compose
+- Evidence: `docker-compose.devops.yml` line 55 (`GF_SECURITY_ADMIN_PASSWORD=admin123`)
+- Class: `secret_exposure`
+- Status: **Present**
+- Severity: **High** (CVSS estimate: 7.5)
+
+3. Jenkins credentials pattern hardcoded in dashboard trigger flow
+- Evidence: `dashboard/app.py` line 198 (`auth=("admin", "your_jenkins_password")`)
+- Class: `secret_exposure`
+- Status: **Present**
+- Severity: **Medium** (CVSS estimate: 6.8)
+
+4. Over-permissive Docker socket permissions in Jenkins startup
+- Evidence: `docker-compose.devops.yml` line 18 (`chmod 666 /var/run/docker.sock`)
+- Class: `rce`
+- Status: **Present**
+- Severity: **Critical** (CVSS estimate: 9.1)
+
+5. Dashboard operational controls lack explicit app-layer auth checks
+- Evidence: `dashboard/app.py` lines 121-222 (control actions for Suricata and Docker operations)
+- Class: `broken_access_control`
+- Status: **Present**
+- Severity: **High** (CVSS estimate: 8.0)
+- Note: Practical exploitability depends on deployment exposure (localhost-only vs shared network).
+
+### 8.2 Previously Existed and Fixed
+
+6. Missing server-side auth on sensitive APIs
+- Evidence (historical): Section A in this report and `ACCESS_CONTROL_FIXES.md`
+- Code-level fix evidence: `backend/main.py` lines 63, 69, 75, 81 (router dependencies with `Depends(get_current_user)`)
+- Class: `broken_access_control`
+- Status: **Fixed**
+- Severity at time of exposure: **High** (CVSS estimate: 8.6)
+
+7. Interview session IDOR risk
+- Evidence (historical): Section C in this report
+- Code-level fix evidence: `backend/app/routers/interview.py` lines 26-33 and owner checks at lines 285, 316, 333, 349, 366
+- Class: `broken_access_control`
+- Status: **Fixed**
+- Severity at time of exposure: **High** (CVSS estimate: 7.7)
+
+8. Path traversal/arbitrary file read in PDF download route
+- Evidence (historical): Section D in this report
+- Code-level fix evidence: `backend/app/routers/career_insights.py` lines 302-307 (safe basename + roadmap pattern restrictions)
+- Class: `path_traversal`
+- Status: **Fixed**
+- Severity at time of exposure: **High** (CVSS estimate: 7.4)
+
+9. Missing rate limiting on expensive AI endpoint
+- Evidence (historical): Section E in this report
+- Code-level fix evidence: `backend/app/routers/resume.py` line 74 (`@limiter.limit("10/minute")`)
+- Class: `other`
+- Status: **Fixed**
+- Severity at time of exposure: **Medium** (CVSS estimate: 6.5)
+
+10. Weak file upload validation (extension-only trust)
+- Evidence (historical): Section G in this report
+- Code-level fix evidence: `backend/app/core/upload_validation.py` line 15 and integration in routers:
+  - `backend/app/routers/resume.py` lines 45, 98, 152
+  - `backend/app/routers/career_insights.py` line 87
+  - `backend/app/routers/job_matching.py` line 100
+- Class: `file_upload`
+- Status: **Fixed**
+- Severity at time of exposure: **High** (CVSS estimate: 7.1)
+
+11. Prompt injection risk in LLM processing of untrusted resume/CV text
+- Evidence (historical): Section F in this report
+- Code-level fix evidence: `backend/app/core/ai_service.py` line 204 and related guarded prompts
+- Class: `other`
+- Status: **Fixed**
+- Severity at time of exposure: **Medium** (CVSS estimate: 5.9)
+
+### 8.3 Validation Notes
+
+- Findings marked **Present** are visible in the current repository state.
+- Findings marked **Fixed** are validated by both project documentation and matching code-level mitigations.
+- CVSS values are engineering estimates for jury reporting and prioritization.
 
 ---
 

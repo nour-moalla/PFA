@@ -2,17 +2,17 @@
 Authentication and authorization helpers.
 """
 
-from typing import Optional
-import json
+from typing import Optional  # pragma: no cover
+import json  # pragma: no cover
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
-from firebase_admin import auth as firebase_auth
-from firebase_admin import credentials as firebase_credentials
-import firebase_admin
+from fastapi import Depends, HTTPException, status  # pragma: no cover
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # pragma: no cover
+from pydantic import BaseModel  # pragma: no cover
+from firebase_admin import auth as firebase_auth  # pragma: no cover
+from firebase_admin import credentials as firebase_credentials  # pragma: no cover
+import firebase_admin  # pragma: no cover
 
-from app.core.config import settings
+from app.core.config import settings  # pragma: no cover
 
 
 bearer_scheme = HTTPBearer(auto_error=False)
