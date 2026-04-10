@@ -106,15 +106,14 @@ pipeline {
         }
         stage('Backend Tests — Coverage') {
             steps {
-                echo 'Running Python tests with coverage report...'
+                echo 'Running Python tests and generating coverage report...'
                 sh '''
                     if [ "${DOCKER_AVAILABLE}" != "true" ]; then
-                        echo "Docker unavailable; skipping tests."
+                        echo "Docker unavailable; skipping."
                         exit 0
                     fi
 
                     docker run --rm \
-                        --network utopiahire-main_default \
                         -v pfa_jenkins_data:/var/jenkins_home \
                         -w /var/jenkins_home/workspace/utopiahire-pipeline/backend \
                         python:3.11-slim \
@@ -124,23 +123,18 @@ pipeline {
                             pytest tests/ \
                                 --cov=app \
                                 --cov-report=xml:/var/jenkins_home/workspace/utopiahire-pipeline/coverage.xml \
-                                --cov-report=term \
                                 -v || true
                         "
                 '''
             }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'coverage.xml', allowEmptyArchive: true
-                }
-            }
         }
+
         stage('SAST — SonarQube Analysis') {
             steps {
-                echo 'Running SonarQube static security analysis...'
+                echo 'Running SonarQube static analysis with coverage...'
                 sh '''
                     if [ "${DOCKER_AVAILABLE}" != "true" ]; then
-                        echo "Docker access is unavailable; skipping SonarQube analysis."
+                        echo "Docker unavailable; skipping."
                         exit 0
                     fi
 
