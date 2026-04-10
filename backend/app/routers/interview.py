@@ -5,7 +5,7 @@ Handles AI-powered interview sessions
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Annotated
 from datetime import datetime
 import uuid
 
@@ -226,7 +226,7 @@ Make sure to include all the markers. The question should be appropriate for a {
 @router.post("/start")
 async def start_interview(
     request: InterviewStartRequest,
-    current_user: AuthUser = Depends(get_current_user),
+    current_user: Annotated[AuthUser, Depends(get_current_user)],
 ):
     """
     Start a new interview session
@@ -273,7 +273,7 @@ async def start_interview(
 @router.post("/answer")
 async def submit_answer(
     request: InterviewAnswerRequest,
-    current_user: AuthUser = Depends(get_current_user),
+    current_user: Annotated[AuthUser, Depends(get_current_user)],
 ):
     """
     Submit an answer and get the next question or feedback
@@ -310,7 +310,7 @@ async def submit_answer(
 @router.get("/history/{session_id}")
 async def get_history(
     session_id: str,
-    current_user: AuthUser = Depends(get_current_user),
+    current_user: Annotated[AuthUser, Depends(get_current_user)],
 ):
     """Get interview history for a session"""
     session = _get_owned_session(session_id, current_user.uid)
@@ -327,7 +327,7 @@ async def get_history(
 @router.get("/scores/{session_id}")
 async def get_scores(
     session_id: str,
-    current_user: AuthUser = Depends(get_current_user),
+    current_user: Annotated[AuthUser, Depends(get_current_user)],
 ):
     """Get interview scores for a session"""
     session = _get_owned_session(session_id, current_user.uid)
@@ -343,7 +343,7 @@ async def get_scores(
 @router.post("/code-question/{session_id}")
 async def request_code_question(
     session_id: str,
-    current_user: AuthUser = Depends(get_current_user),
+    current_user: Annotated[AuthUser, Depends(get_current_user)],
 ):
     """Request AI to provide a properly formatted code question"""
     session = _get_owned_session(session_id, current_user.uid)
@@ -360,7 +360,7 @@ async def request_code_question(
 @router.delete("/session/{session_id}")
 async def end_session(
     session_id: str,
-    current_user: AuthUser = Depends(get_current_user),
+    current_user: Annotated[AuthUser, Depends(get_current_user)],
 ):
     """End interview session and cleanup"""
     _get_owned_session(session_id, current_user.uid)

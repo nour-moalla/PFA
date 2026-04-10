@@ -2,7 +2,7 @@
 Authentication and authorization helpers.
 """
 
-from typing import Optional
+from typing import Optional, Annotated
 import json
 
 from fastapi import Depends, HTTPException, status
@@ -46,7 +46,7 @@ def _initialize_firebase() -> bool:
 
 
 def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
+    credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(bearer_scheme)] = None,
 ) -> AuthUser:
     """Validate Firebase ID token and return authenticated user."""
     if credentials is None or not credentials.credentials:
