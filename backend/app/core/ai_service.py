@@ -24,10 +24,13 @@ class AIService:
     def __init__(self):
         """Initialize AI service with OpenAI-compatible client"""
         if not settings.AI_API_KEY:
-            logger.warning("AI_API_KEY not set — AI features disabled")
+            logger.warning("AI_API_KEY not set — AI features will be unavailable")
+            self.client = None
+            self.model = None
+            return
         
         self.client = OpenAI(
-            api_key=settings.AI_API_KEY or "dummy-key-placeholder",
+            api_key=settings.AI_API_KEY,
             base_url=settings.AI_BASE_URL,
         )
         self.model = settings.AI_MODEL
@@ -57,6 +60,9 @@ class AIService:
         max_delay: float = 10.0,
     ) -> Any:
         """Generate content with exponential backoff retry logic"""
+        if self.client is None:
+            raise RuntimeError("AI service not available: AI_API_KEY is not configured")
+        
         model = model or self.model
         attempt = 0
         
