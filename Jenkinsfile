@@ -113,22 +113,46 @@ pipeline {
                         exit 0
                     fi
 
+                    WORKSPACE_PATH="/var/jenkins_home/workspace/utopiahire-pipeline"
+
                     docker run --rm \
                         -v pfa_jenkins_data:/var/jenkins_home \
-                        -w /var/jenkins_home/workspace/utopiahire-pipeline/backend \
+                        -w ${WORKSPACE_PATH}/backend \
                         python:3.11-slim \
                         sh -c "
-                            pip install -r requirements.txt -q &&
-                            pip install pytest pytest-cov -q &&
-                            pytest tests/ \
+                            set -e
+                            echo '=== Installing dependencies ==='
+                            pip install -r requirements.txt -q
+                            pip install pytest pytest-cov -q
+
+                            echo '=== Checking for tests folder ==='
+                            ls -la .
+
+                            echo '=== Running pytest with coverage ==='
+                            python -m pytest \
                                 --cov=app \
-                                --cov-report=xml:/var/jenkins_home/workspace/utopiahire-pipeline/coverage.xml \
-                                -v || true
+                                --cov-report=xml:${WORKSPACE_PATH}/coverage.xml \
+                                --cov-report=term \
+                                -v \
+                                --tb=short \
+                                2>&1 || echo 'pytest exited with errors above'
+
+                            echo '=== Verifying coverage.xml was created ==='
+                            ls -la ${WORKSPACE_PATH}/coverage.xml || echo 'coverage.xml was NOT created'
                         "
                 '''
             }
         }
-
+        stage('Verify Coverage File') {
+            steps {
+                sh '''
+                    echo "=== Checking for coverage.xml ==="
+                    ls -la /var/jenkins_home/workspace/utopiahire-pipeline/coverage.xml || echo "FILE NOT FOUND"
+                    echo "=== Workspace contents ==="
+                    ls -la /var/jenkins_home/workspace/utopiahire-pipeline/
+                '''
+            }
+        }
         stage('SAST — SonarQube Analysis') {
             steps {
                 echo 'Running SonarQube static analysis with coverage...'
