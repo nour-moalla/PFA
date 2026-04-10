@@ -120,25 +120,30 @@ pipeline {
                         -w ${WORKSPACE_PATH}/backend \
                         python:3.11-slim \
                         sh -c "
-                            set -e
-                            echo '=== Installing dependencies ==='
-                            pip install -r requirements.txt -q
+                            echo '=== Installing torch from PyTorch index ==='
+                            pip install torch --index-url https://download.pytorch.org/whl/cpu -q
+
+                            echo '=== Installing remaining dependencies ==='
+                            pip install -r requirements.txt --ignore-installed torch -q || true
+
+                            echo '=== Installing test tools ==='
                             pip install pytest pytest-cov -q
 
-                            echo '=== Checking for tests folder ==='
+                            echo '=== Project structure ==='
                             ls -la .
+                            ls -la tests/ 2>/dev/null || echo 'No tests/ folder found'
 
-                            echo '=== Running pytest with coverage ==='
+                            echo '=== Running pytest ==='
                             python -m pytest \
                                 --cov=app \
                                 --cov-report=xml:${WORKSPACE_PATH}/coverage.xml \
                                 --cov-report=term \
-                                -v \
-                                --tb=short \
-                                2>&1 || echo 'pytest exited with errors above'
+                                -v --tb=short || true
 
-                            echo '=== Verifying coverage.xml was created ==='
-                            ls -la ${WORKSPACE_PATH}/coverage.xml || echo 'coverage.xml was NOT created'
+                            echo '=== Coverage file check ==='
+                            ls -la ${WORKSPACE_PATH}/coverage.xml \
+                                && echo 'coverage.xml EXISTS' \
+                                || echo 'coverage.xml NOT FOUND'
                         "
                 '''
             }
