@@ -2,8 +2,7 @@
 import pytest
 from io import BytesIO
 from unittest.mock import AsyncMock, patch, MagicMock
-from fastapi.uploadfile import UploadFile
-from fastapi import HTTPException
+from fastapi import UploadFile, HTTPException
 
 from app.core.upload_validation import validate_pdf_upload, MAX_SIZE
 

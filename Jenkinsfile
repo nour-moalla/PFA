@@ -115,6 +115,10 @@ pipeline {
 
                     WORKSPACE_PATH="/var/jenkins_home/workspace/utopiahire-pipeline"
 
+                    # Delete any stale coverage file from previous runs
+                    rm -f ${WORKSPACE_PATH}/coverage.xml
+                    echo "Cleared old coverage.xml"
+
                     docker run --rm \
                         -v pfa_jenkins_data:/var/jenkins_home \
                         -w ${WORKSPACE_PATH}/backend \
@@ -137,7 +141,7 @@ pipeline {
                             echo '=== Coverage file check ==='
                             ls -la ${WORKSPACE_PATH}/coverage.xml \
                                 && echo 'coverage.xml EXISTS' \
-                                || echo 'coverage.xml NOT FOUND'
+                                || echo 'coverage.xml NOT FOUND - tests all failed'
                         "
                 '''
             }
