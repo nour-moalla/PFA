@@ -120,24 +120,18 @@ pipeline {
                         -w ${WORKSPACE_PATH}/backend \
                         python:3.11-slim \
                         sh -c "
-                            echo '=== Installing torch from PyTorch index ==='
-                            pip install torch --index-url https://download.pytorch.org/whl/cpu -q
-
-                            echo '=== Installing remaining dependencies ==='
-                            pip install -r requirements.txt --ignore-installed torch -q || true
+                            echo '=== Installing dependencies (excluding torch) ==='
+                            grep -v 'torch' requirements.txt > requirements-test.txt
+                            pip install -r requirements-test.txt -q
 
                             echo '=== Installing test tools ==='
                             pip install pytest pytest-cov -q
-
-                            echo '=== Project structure ==='
-                            ls -la .
-                            ls -la tests/ 2>/dev/null || echo 'No tests/ folder found'
 
                             echo '=== Running pytest ==='
                             python -m pytest \
                                 --cov=app \
                                 --cov-report=xml:${WORKSPACE_PATH}/coverage.xml \
-                                --cov-report=term \
+                                --cov-report=term-missing \
                                 -v --tb=short || true
 
                             echo '=== Coverage file check ==='
