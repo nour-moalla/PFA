@@ -114,8 +114,6 @@ pipeline {
                     fi
 
                     WORKSPACE_PATH="/var/jenkins_home/workspace/utopiahire-pipeline"
-
-                    # Delete any stale coverage file from previous runs
                     rm -f ${WORKSPACE_PATH}/coverage.xml
                     echo "Cleared old coverage.xml"
 
@@ -124,7 +122,10 @@ pipeline {
                         -w ${WORKSPACE_PATH}/backend \
                         python:3.11-slim \
                         sh -c "
-                            echo '=== Installing dependencies (excluding torch) ==='
+                            echo '=== Installing system dependencies ==='
+                            apt-get update -q && apt-get install -y libmagic1 -q
+
+                            echo '=== Installing Python dependencies (excluding torch) ==='
                             grep -v 'torch' requirements.txt > requirements-test.txt
                             pip install -r requirements-test.txt -q
 
@@ -134,14 +135,23 @@ pipeline {
                             echo '=== Running pytest ==='
                             python -m pytest \
                                 --cov=app \
+                                --cov-config=.coveragerc \
                                 --cov-report=xml:${WORKSPACE_PATH}/coverage.xml \
                                 --cov-report=term-missing \
                                 -v --tb=short || true
 
+                            echo '=== Fixing paths in coverage.xml for SonarQube ==='
+                            if [ -f ${WORKSPACE_PATH}/coverage.xml ]; then
+                                sed -i 's|${WORKSPACE_PATH}/backend/||g' ${WORKSPACE_PATH}/coverage.xml
+                                sed -i 's|/var/jenkins_home/workspace/utopiahire-pipeline/backend/||g' ${WORKSPACE_PATH}/coverage.xml
+                                echo 'Paths fixed in coverage.xml'
+                                head -5 ${WORKSPACE_PATH}/coverage.xml
+                            fi
+
                             echo '=== Coverage file check ==='
                             ls -la ${WORKSPACE_PATH}/coverage.xml \
                                 && echo 'coverage.xml EXISTS' \
-                                || echo 'coverage.xml NOT FOUND - tests all failed'
+                                || echo 'coverage.xml NOT FOUND'
                         "
                 '''
             }
@@ -176,6 +186,7 @@ pipeline {
                         -Dsonar.projectName=UtopiaHire \
                         -Dsonar.sources=backend,frontend \
                         -Dsonar.exclusions=**/node_modules/**,**/.git/**,**/security-reports/**,**/tests/** \
+                        -Dsonar.python.version=3.11 \
                         -Dsonar.python.coverage.reportPaths=coverage.xml \
                         -Dsonar.coverage.exclusions=**/tests/**,**/__init__.py \
                         -Dsonar.scm.provider=git || true

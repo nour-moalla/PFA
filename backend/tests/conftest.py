@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 sys.modules['torch'] = MagicMock()
 sys.modules['torch.nn'] = MagicMock()
 sys.modules['torch.nn.functional'] = MagicMock()
+sys.modules['sentence_transformers'] = MagicMock()
 
 @pytest.fixture
 def mock_auth_user():
