@@ -4,7 +4,6 @@ pipeline {
     environment {
         SONARQUBE_URL = 'http://utopiahire-sonarqube:9000'
         SONAR_TOKEN   = credentials('SONAR-TOKEN')
-        AI_API_KEY    = credentials('AI-API-KEY')
         APP_BACKEND   = 'http://utopiahire-backend:8000'
         REPORT_DIR    = 'security-reports'
     }
