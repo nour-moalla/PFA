@@ -24,10 +24,10 @@ class AIService:
     def __init__(self):
         """Initialize AI service with OpenAI-compatible client"""
         if not settings.AI_API_KEY:
-            raise ValueError("AI_API_KEY not found in environment variables. Please set it in your .env file.")
+            logger.warning("AI_API_KEY not set — AI features disabled")
         
         self.client = OpenAI(
-            api_key=settings.AI_API_KEY,
+            api_key=settings.AI_API_KEY or "dummy-key-placeholder",
             base_url=settings.AI_BASE_URL,
         )
         self.model = settings.AI_MODEL

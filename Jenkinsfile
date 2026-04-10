@@ -4,6 +4,7 @@ pipeline {
     environment {
         SONARQUBE_URL = 'http://utopiahire-sonarqube:9000'
         SONAR_TOKEN   = credentials('SONAR-TOKEN')
+        AI_API_KEY    = credentials('AI-API-KEY')
         APP_BACKEND   = 'http://utopiahire-backend:8000'
         REPORT_DIR    = 'security-reports'
     }
@@ -357,6 +358,9 @@ pipeline {
                         fi
                         sleep 5
                     done
+
+                    echo "=== Backend container logs ==="
+                    docker logs utopiahire-backend --tail 50 || true
                 '''
             }
         }
@@ -376,13 +380,13 @@ pipeline {
 
                     docker run --rm \
                         --network utopiahire-main_default \
-                        -v pfa_jenkins_data:/var/jenkins_home \
+                        -v /var/jenkins_home/workspace/utopiahire-pipeline/security-reports:/zap/wrk \
                         -u root \
                         ghcr.io/zaproxy/zaproxy:stable \
                         zap-baseline.py \
                         -t http://utopiahire-backend:8000 \
-                        -r /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/zap-report.html \
-                        -J /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/zap-report.json \
+                        -r /zap/wrk/zap-report.html \
+                        -J /zap/wrk/zap-report.json \
                         -I || true
                 '''
             }
