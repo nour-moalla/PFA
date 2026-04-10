@@ -7,24 +7,24 @@ Combines features from:
 - Job Matcher
 """
 
-import logging  # pragma: no cover
-from fastapi import Depends, FastAPI, Request  # pragma: no cover
-from fastapi.middleware.cors import CORSMiddleware  # pragma: no cover
-from datetime import datetime  # pragma: no cover
-from slowapi import _rate_limit_exceeded_handler  # pragma: no cover
-from slowapi.errors import RateLimitExceeded  # pragma: no cover
-from prometheus_fastapi_instrumentator import Instrumentator  # pragma: no cover
+import logging
+from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from prometheus_fastapi_instrumentator import Instrumentator
 
-from app.core.auth import get_current_user  # pragma: no cover
-from app.core.config import settings  # pragma: no cover
+from app.core.auth import get_current_user
+from app.core.config import settings
 
-from app.routers import (  # pragma: no cover
-    resume,  # pragma: no cover
-    interview,  # pragma: no cover
-    career_insights,  # pragma: no cover
-    job_matching  # pragma: no cover
-)  # pragma: no cover
-from app.core.rate_limit import limiter  # pragma: no cover
+from app.routers import (
+    resume,
+    interview,
+    career_insights,
+    job_matching
+)
+from app.core.rate_limit import limiter
 
 logging.basicConfig(
     level=logging.INFO,

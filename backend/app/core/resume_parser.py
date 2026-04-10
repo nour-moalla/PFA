@@ -3,10 +3,10 @@ Resume Parser Module
 Extracts and structures resume data from PDF files
 """
 
-import re  # pragma: no cover
-from typing import Dict, List, Optional  # pragma: no cover
-import pdfplumber  # pragma: no cover
-from pathlib import Path  # pragma: no cover
+import re
+from typing import Dict, List, Optional
+import pdfplumber
+from pathlib import Path
 
 
 class ResumeParser:

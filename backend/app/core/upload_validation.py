@@ -2,11 +2,11 @@
 Secure upload validation helpers.
 """
 
-from typing import Tuple  # pragma: no cover
-from uuid import uuid4  # pragma: no cover
+from typing import Tuple
+from uuid import uuid4
 
-import magic  # pragma: no cover
-from fastapi import HTTPException, UploadFile  # pragma: no cover
+import magic
+from fastapi import HTTPException, UploadFile
 
 
 MAX_SIZE = 5 * 1024 * 1024  # 5MB
