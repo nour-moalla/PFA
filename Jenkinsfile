@@ -291,15 +291,16 @@ pipeline {
                         exit 0
                     fi
 
-                    mkdir -p /var/jenkins_home/workspace/utopiahire-pipeline/security-reports
+                    mkdir -p security-reports
 
                     docker run --rm \
-                        -v pfa_jenkins_data:/var/jenkins_home \
+                        -v $(pwd):/project \
+                        -w /project \
                         bridgecrew/checkov:latest \
-                        --file /var/jenkins_home/workspace/utopiahire-pipeline/backend/Dockerfile \
-                        --file /var/jenkins_home/workspace/utopiahire-pipeline/frontend/Dockerfile \
+                        --file /project/backend/Dockerfile \
+                        --file /project/frontend/Dockerfile \
                         --output json \
-                        --output-file-path /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/ || true
+                        --output-file-path /project/security-reports/ || true
                 '''
             }
             post {
