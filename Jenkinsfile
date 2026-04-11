@@ -175,7 +175,7 @@ pipeline {
                         -Dsonar.python.version=3.11 \
                         -Dsonar.python.coverage.reportPaths=coverage.xml \
                         -Dsonar.coverage.exclusions=**/tests/**,**/__init__.py \
-                        -Dsonar.scm.provider=git || true
+                        -Dsonar.scm.disabled=true || true
                 '''
             }
         }
