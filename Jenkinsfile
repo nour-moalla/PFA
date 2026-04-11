@@ -163,10 +163,10 @@ pipeline {
 
                     docker run --rm \
                         --network utopiahire-main_default \
+                        --volumes-from jenkins \
                         -e SONAR_HOST_URL="${SONARQUBE_URL}" \
                         -e SONAR_TOKEN="${SONAR_TOKEN}" \
-                        -v $(pwd):/usr/src \
-                        -w /usr/src \
+                        -w /var/jenkins_home/workspace/utopiahire-pipeline \
                         sonarsource/sonar-scanner-cli \
                         -Dsonar.projectKey=utopiahire \
                         -Dsonar.projectName=UtopiaHire \
@@ -179,7 +179,6 @@ pipeline {
                 '''
             }
         }
-
         stage('Dependency Audit') {
             steps {
                 echo 'Checking for known vulnerable dependencies...'
