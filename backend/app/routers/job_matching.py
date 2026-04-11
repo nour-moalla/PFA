@@ -5,7 +5,7 @@ Handles CV-to-job matching using semantic search
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from datetime import datetime
 import logging
 import pandas as pd
@@ -14,6 +14,7 @@ import numpy as np
 # import torch
 import ast
 import anyio
+from typing import Annotated
 
 from app.core.ai_service import ai_service
 from app.core.resume_parser import ResumeParser
