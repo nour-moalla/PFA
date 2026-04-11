@@ -118,16 +118,17 @@ pipeline {
                     WORKSPACE_PATH="/var/jenkins_home/workspace/utopiahire-pipeline"
                     rm -f ${WORKSPACE_PATH}/coverage.xml
 
-                    docker exec utopiahire-backend sh -c "
+                    docker exec -u root utopiahire-backend sh -c "
                         cd /app &&
                         pip install pytest pytest-cov anyio pytest-asyncio -q > /dev/null 2>&1 &&
                         python -m pytest \
                             --cov=app \
-                            --cov-config=.coveragerc \
-                            --cov-report=xml:/tmp/coverage.xml \
-                            -q > /dev/null 2>&1 || true &&
-                        cat /tmp/coverage.xml
-                    " > ${WORKSPACE_PATH}/coverage.xml 2>/dev/null || true
+                            --cov-report=xml \
+                            -q > /dev/null 2>&1 || true
+                    "
+
+                    docker cp utopiahire-backend:/app/coverage.xml \
+                        ${WORKSPACE_PATH}/coverage.xml 2>/dev/null || true
 
                     if [ -f ${WORKSPACE_PATH}/coverage.xml ] && [ -s ${WORKSPACE_PATH}/coverage.xml ]; then
                         sed -i 's|<source>app</source>|<source>backend/app</source>|g' ${WORKSPACE_PATH}/coverage.xml
