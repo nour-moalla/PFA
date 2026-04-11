@@ -118,37 +118,21 @@ pipeline {
                     WORKSPACE_PATH="/var/jenkins_home/workspace/utopiahire-pipeline"
                     rm -f ${WORKSPACE_PATH}/coverage.xml
 
-                    # Write the test script to a file instead of passing inline
-                    cat > /tmp/run_tests.sh << 'TESTSCRIPT'
-        #!/bin/sh
-        apt-get update -q && apt-get install -y libmagic1 -q > /dev/null 2>&1
-        grep -v torch requirements.txt > requirements-test.txt 2>/dev/null || true
-        pip install -r requirements-test.txt -q > /dev/null 2>&1
-        pip install pytest pytest-cov anyio pytest-asyncio -q > /dev/null 2>&1
-        python -m pytest \
-            --cov=app \
-            --cov-config=.coveragerc \
-            --cov-report=xml:/var/jenkins_home/workspace/utopiahire-pipeline/coverage.xml \
-            -q > /dev/null 2>&1 || true
-        if [ -f /var/jenkins_home/workspace/utopiahire-pipeline/coverage.xml ]; then
-            sed -i 's|<source>app</source>|<source>backend/app</source>|g' /var/jenkins_home/workspace/utopiahire-pipeline/coverage.xml
-            sed -i 's|filename="app/|filename="backend/app/|g' /var/jenkins_home/workspace/utopiahire-pipeline/coverage.xml
-        fi
-        TESTSCRIPT
+                    docker exec utopiahire-backend sh -c "
+                        cd /app &&
+                        pip install pytest pytest-cov anyio pytest-asyncio -q > /dev/null 2>&1 &&
+                        python -m pytest \
+                            --cov=app \
+                            --cov-config=.coveragerc \
+                            --cov-report=xml:/tmp/coverage.xml \
+                            -q > /dev/null 2>&1 || true &&
+                        cat /tmp/coverage.xml
+                    " > ${WORKSPACE_PATH}/coverage.xml 2>/dev/null || true
 
-                    chmod +x /tmp/run_tests.sh
-
-                    # Copy script into jenkins volume and run detached
-                    docker run --rm \
-                        -v pfa_jenkins_data:/var/jenkins_home \
-                        -v /tmp/run_tests.sh:/run_tests.sh \
-                        -w ${WORKSPACE_PATH}/backend \
-                        python:3.11-slim \
-                        sh /run_tests.sh
-
-                    if [ -f ${WORKSPACE_PATH}/coverage.xml ]; then
+                    if [ -f ${WORKSPACE_PATH}/coverage.xml ] && [ -s ${WORKSPACE_PATH}/coverage.xml ]; then
+                        sed -i 's|<source>app</source>|<source>backend/app</source>|g' ${WORKSPACE_PATH}/coverage.xml
+                        sed -i 's|filename="app/|filename="backend/app/|g' ${WORKSPACE_PATH}/coverage.xml
                         echo "coverage.xml created successfully"
-                        wc -l ${WORKSPACE_PATH}/coverage.xml
                     else
                         echo "coverage.xml NOT created"
                     fi
