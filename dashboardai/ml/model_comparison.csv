@@ -1,0 +1,4 @@
+Model,Accuracy,Precision,Recall,F1 Score
+Random Forest,54.55%,56.06%,54.55%,46.97%
+Logistic Regression,45.45%,68.18%,45.45%,51.82%
+SVM,72.73%,86.36%,72.73%,78.18%

@@ -115,46 +115,29 @@ pipeline {
 
                     WORKSPACE_PATH="/var/jenkins_home/workspace/utopiahire-pipeline"
                     rm -f ${WORKSPACE_PATH}/coverage.xml
-                    echo "Cleared old coverage.xml"
 
                     docker run --rm \
                         -v pfa_jenkins_data:/var/jenkins_home \
                         -w ${WORKSPACE_PATH}/backend \
                         python:3.11-slim \
                         sh -c "
-                            echo '=== Installing system dependencies ==='
-                            apt-get update -q && apt-get install -y libmagic1 -q
-
-                            echo '=== Installing Python dependencies (excluding torch) ==='
-                            grep -v 'torch' requirements.txt > requirements-test.txt
-                            pip install -r requirements-test.txt -q
-
-                            echo '=== Installing test tools ==='
-                            pip install pytest pytest-cov anyio pytest-asyncio -q
-
-                            echo '=== Running pytest ==='
+                            apt-get update -q && apt-get install -y libmagic1 -q 2>/dev/null
+                            grep -v torch requirements.txt > requirements-test.txt
+                            pip install -r requirements-test.txt -q 2>/dev/null
+                            pip install pytest pytest-cov anyio pytest-asyncio -q 2>/dev/null
                             python -m pytest \
                                 --cov=app \
                                 --cov-config=.coveragerc \
                                 --cov-report=xml:${WORKSPACE_PATH}/coverage.xml \
-                                --cov-report=term-missing \
-                                -v --tb=short || true
-
-                            echo '=== Fixing paths in coverage.xml for SonarQube ==='
+                                -v --tb=short 2>&1 || true
                             if [ -f ${WORKSPACE_PATH}/coverage.xml ]; then
-                                sed -i 's|<source>app</source>|<source>backend/app</source>|g' \
-                                    ${WORKSPACE_PATH}/coverage.xml
-                                sed -i 's|filename="app/|filename="backend/app/|g' \
-                                    ${WORKSPACE_PATH}/coverage.xml
-                                echo 'Paths fixed'
-                                grep -m3 -E 'source|filename' ${WORKSPACE_PATH}/coverage.xml
+                                sed -i 's|<source>app</source>|<source>backend/app</source>|g' ${WORKSPACE_PATH}/coverage.xml
+                                sed -i 's|filename=\"app/|filename=\"backend/app/|g' ${WORKSPACE_PATH}/coverage.xml
+                                echo coverage.xml created successfully
+                            else
+                                echo coverage.xml NOT created
                             fi
-
-                            echo '=== Coverage file check ==='
-                            ls -la ${WORKSPACE_PATH}/coverage.xml \
-                                && echo 'coverage.xml EXISTS' \
-                                || echo 'coverage.xml NOT FOUND'
-                        "
+                        " 2>&1
                 '''
             }
         }
