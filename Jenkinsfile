@@ -130,7 +130,7 @@ pipeline {
                             pip install -r requirements-test.txt -q
 
                             echo '=== Installing test tools ==='
-                            pip install pytest pytest-cov -q
+                            pip install pytest pytest-cov anyio pytest-asyncio -q
 
                             echo '=== Running pytest ==='
                             python -m pytest \
@@ -142,10 +142,12 @@ pipeline {
 
                             echo '=== Fixing paths in coverage.xml for SonarQube ==='
                             if [ -f ${WORKSPACE_PATH}/coverage.xml ]; then
-                                sed -i 's|${WORKSPACE_PATH}/backend/||g' ${WORKSPACE_PATH}/coverage.xml
-                                sed -i 's|/var/jenkins_home/workspace/utopiahire-pipeline/backend/||g' ${WORKSPACE_PATH}/coverage.xml
-                                echo 'Paths fixed in coverage.xml'
-                                head -5 ${WORKSPACE_PATH}/coverage.xml
+                                sed -i 's|<source>app</source>|<source>backend/app</source>|g' \
+                                    ${WORKSPACE_PATH}/coverage.xml
+                                sed -i 's|filename="app/|filename="backend/app/|g' \
+                                    ${WORKSPACE_PATH}/coverage.xml
+                                echo 'Paths fixed'
+                                grep -m3 'source\|filename' ${WORKSPACE_PATH}/coverage.xml
                             fi
 
                             echo '=== Coverage file check ==='

@@ -1,22 +1,16 @@
 """Tests for rate limiting configuration"""
 from app.core.rate_limit import limiter
-
+from slowapi import Limiter
 
 def test_limiter_exists():
-    """Test that rate limiter is properly initialized"""
     assert limiter is not None
 
-
 def test_limiter_is_limiter_instance():
-    """Test that limiter is an instance of slowapi Limiter"""
-    from slowapi import Limiter
     assert isinstance(limiter, Limiter)
 
-
-def test_limiter_has_key_function():
-    """Test that limiter has a key function configured"""
-    assert limiter.key_func is not None
-    assert callable(limiter.key_func)
+def test_limiter_can_be_imported():
+    from app.core.rate_limit import limiter as l
+    assert l is not None
 
 
 def test_limiter_key_function_is_remote_address():
