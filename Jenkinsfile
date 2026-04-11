@@ -297,10 +297,17 @@ pipeline {
                         -v $(pwd):/project \
                         -w /project \
                         bridgecrew/checkov:latest \
-                        --file /project/backend/Dockerfile \
-                        --file /project/frontend/Dockerfile \
+                        --directory /project \
+                        --include-all-checkov-policies \
+                        --check CKV_DOCKER \
                         --output json \
                         --output-file-path /project/security-reports/ || true
+
+                    if [ -f security-reports/results_json.json ]; then
+                        echo "Checkov scan completed successfully"
+                    else
+                        echo "Checkov produced no output file"
+                    fi
                 '''
             }
             post {
