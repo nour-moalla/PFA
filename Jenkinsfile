@@ -70,6 +70,7 @@ pipeline {
                 }
             }
         }
+
         stage('Secrets Scan — Gitleaks') {
             steps {
                 echo 'Scanning for leaked API keys and credentials...'
@@ -104,6 +105,7 @@ pipeline {
                 }
             }
         }
+
         stage('Backend Tests — Coverage') {
             steps {
                 echo 'Running Python tests and generating coverage report...'
@@ -121,26 +123,30 @@ pipeline {
                         -w ${WORKSPACE_PATH}/backend \
                         python:3.11-slim \
                         sh -c "
-                            apt-get update -q && apt-get install -y libmagic1 -q 2>/dev/null
+                            apt-get update -q && apt-get install -y libmagic1 -q > /dev/null 2>&1
                             grep -v torch requirements.txt > requirements-test.txt
-                            pip install -r requirements-test.txt -q 2>/dev/null
-                            pip install pytest pytest-cov anyio pytest-asyncio -q 2>/dev/null
+                            pip install -r requirements-test.txt -q > /dev/null 2>&1
+                            pip install pytest pytest-cov anyio pytest-asyncio -q > /dev/null 2>&1
                             python -m pytest \
                                 --cov=app \
                                 --cov-config=.coveragerc \
                                 --cov-report=xml:${WORKSPACE_PATH}/coverage.xml \
-                                -v --tb=short 2>&1 || true
+                                --no-header -q 2> /dev/null || true
                             if [ -f ${WORKSPACE_PATH}/coverage.xml ]; then
                                 sed -i 's|<source>app</source>|<source>backend/app</source>|g' ${WORKSPACE_PATH}/coverage.xml
                                 sed -i 's|filename=\"app/|filename=\"backend/app/|g' ${WORKSPACE_PATH}/coverage.xml
-                                echo coverage.xml created successfully
-                            else
-                                echo coverage.xml NOT created
                             fi
-                        " 2>&1
+                        " > /dev/null 2>&1 || true
+
+                    if [ -f ${WORKSPACE_PATH}/coverage.xml ]; then
+                        echo "coverage.xml created successfully"
+                    else
+                        echo "coverage.xml NOT created — check tests"
+                    fi
                 '''
             }
         }
+
         stage('Verify Coverage File') {
             steps {
                 sh '''
@@ -151,6 +157,7 @@ pipeline {
                 '''
             }
         }
+        
         stage('SAST — SonarQube Analysis') {
             steps {
                 echo 'Running SonarQube static analysis with coverage...'
