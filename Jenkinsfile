@@ -147,7 +147,7 @@ pipeline {
                                 sed -i 's|filename="app/|filename="backend/app/|g' \
                                     ${WORKSPACE_PATH}/coverage.xml
                                 echo 'Paths fixed'
-                                grep -m3 'source\|filename' ${WORKSPACE_PATH}/coverage.xml
+                                grep -m3 -E 'source|filename' ${WORKSPACE_PATH}/coverage.xml
                             fi
 
                             echo '=== Coverage file check ==='
