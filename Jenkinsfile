@@ -114,31 +114,41 @@ pipeline {
                     fi
 
                     WORKSPACE_PATH="/var/jenkins_home/workspace/utopiahire-pipeline"
+                    rm -f ${WORKSPACE_PATH}/coverage.xml
+                    echo "Cleared old coverage.xml"
 
                     docker run --rm \
                         -v pfa_jenkins_data:/var/jenkins_home \
                         -w ${WORKSPACE_PATH}/backend \
                         python:3.11-slim \
                         sh -c "
-                            echo '=== Installing torch from PyTorch index ==='
-                            pip install torch --index-url https://download.pytorch.org/whl/cpu -q
+                            echo '=== Installing system dependencies ==='
+                            apt-get update -q && apt-get install -y libmagic1 -q
 
-                            echo '=== Installing remaining dependencies ==='
-                            pip install -r requirements.txt --ignore-installed torch -q || true
+                            echo '=== Installing Python dependencies (excluding torch) ==='
+                            grep -v 'torch' requirements.txt > requirements-test.txt
+                            pip install -r requirements-test.txt -q
 
                             echo '=== Installing test tools ==='
-                            pip install pytest pytest-cov -q
-
-                            echo '=== Project structure ==='
-                            ls -la .
-                            ls -la tests/ 2>/dev/null || echo 'No tests/ folder found'
+                            pip install pytest pytest-cov anyio pytest-asyncio -q
 
                             echo '=== Running pytest ==='
                             python -m pytest \
                                 --cov=app \
+                                --cov-config=.coveragerc \
                                 --cov-report=xml:${WORKSPACE_PATH}/coverage.xml \
-                                --cov-report=term \
+                                --cov-report=term-missing \
                                 -v --tb=short || true
+
+                            echo '=== Fixing paths in coverage.xml for SonarQube ==='
+                            if [ -f ${WORKSPACE_PATH}/coverage.xml ]; then
+                                sed -i 's|<source>app</source>|<source>backend/app</source>|g' \
+                                    ${WORKSPACE_PATH}/coverage.xml
+                                sed -i 's|filename="app/|filename="backend/app/|g' \
+                                    ${WORKSPACE_PATH}/coverage.xml
+                                echo 'Paths fixed'
+                                grep -m3 -E 'source|filename' ${WORKSPACE_PATH}/coverage.xml
+                            fi
 
                             echo '=== Coverage file check ==='
                             ls -la ${WORKSPACE_PATH}/coverage.xml \
@@ -178,6 +188,7 @@ pipeline {
                         -Dsonar.projectName=UtopiaHire \
                         -Dsonar.sources=backend,frontend \
                         -Dsonar.exclusions=**/node_modules/**,**/.git/**,**/security-reports/**,**/tests/** \
+                        -Dsonar.python.version=3.11 \
                         -Dsonar.python.coverage.reportPaths=coverage.xml \
                         -Dsonar.coverage.exclusions=**/tests/**,**/__init__.py \
                         -Dsonar.scm.provider=git || true
@@ -359,6 +370,9 @@ pipeline {
                         fi
                         sleep 5
                     done
+
+                    echo "=== Backend container logs ==="
+                    docker logs utopiahire-backend --tail 50 || true
                 '''
             }
         }
@@ -378,13 +392,13 @@ pipeline {
 
                     docker run --rm \
                         --network utopiahire-main_default \
-                        -v pfa_jenkins_data:/var/jenkins_home \
+                        -v /var/jenkins_home/workspace/utopiahire-pipeline/security-reports:/zap/wrk \
                         -u root \
                         ghcr.io/zaproxy/zaproxy:stable \
                         zap-baseline.py \
                         -t http://utopiahire-backend:8000 \
-                        -r /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/zap-report.html \
-                        -J /var/jenkins_home/workspace/utopiahire-pipeline/security-reports/zap-report.json \
+                        -r /zap/wrk/zap-report.html \
+                        -J /zap/wrk/zap-report.json \
                         -I || true
                 '''
             }

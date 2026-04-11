@@ -2,6 +2,14 @@
 import pytest
 from unittest.mock import AsyncMock
 
+import sys
+from unittest.mock import MagicMock
+
+# Mock torch before any app module imports it
+sys.modules['torch'] = MagicMock()
+sys.modules['torch.nn'] = MagicMock()
+sys.modules['torch.nn.functional'] = MagicMock()
+sys.modules['sentence_transformers'] = MagicMock()
 
 @pytest.fixture
 def mock_auth_user():
