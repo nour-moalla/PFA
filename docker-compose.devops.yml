@@ -84,8 +84,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./security-reports:/app/security-reports
       - ./suricata/logs:/app/suricata/logs
-    environment:
-      - OPENAI_API_KEY=${AI_API_KEY}
+    env_file:
+      - ./dashboard/.env
     restart: unless-stopped
     networks:
       - utopia_net

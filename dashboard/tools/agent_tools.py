@@ -1,8 +1,8 @@
 import json
 import os
 import joblib
-from langchain.tools import tool
-from tools.rag_engine import search_knowledge_base
+from langchain_core.tools import tool
+from rag_engine import search_knowledge_base
 
 # ─── TOOL 1: Read Gitleaks secrets scan results ───────────────────
 @tool
