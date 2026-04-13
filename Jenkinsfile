@@ -400,18 +400,17 @@ pipeline {
                 }
             }
         }
+
         stage('AI Security Analysis') {
                     steps {
                         echo 'Generating AI security recommendations via LLaMA 3.1:8b...'
                         sh '''
                             mkdir -p security-reports
 
-                            cat > /tmp/ai_analysis.py << 'PYEOF'
+                            cat > /tmp/ai_analysis.py << PYEOF
         import json, os, requests
-
         findings = []
-
-        gl_path = '/var/jenkins_home/workspace/utopiahire-pipeline/security-reports/gitleaks-report.json'
+        gl_path = '/reports/gitleaks-report.json'
         if os.path.exists(gl_path):
             try:
                 d = json.load(open(gl_path))
@@ -422,8 +421,7 @@ pipeline {
                     findings.append('Gitleaks: Repository is clean - no secrets found')
             except:
                 findings.append('Gitleaks: Could not read report')
-
-        zp_path = '/var/jenkins_home/workspace/utopiahire-pipeline/security-reports/zap-report.json'
+        zp_path = '/reports/zap-report.json'
         if os.path.exists(zp_path):
             try:
                 d2 = json.load(open(zp_path))
@@ -438,32 +436,26 @@ pipeline {
                     findings.append('ZAP: No high or medium alerts found')
             except:
                 findings.append('ZAP: Could not read report')
-
         if not findings:
             findings.append('No scan data available in security-reports/')
-
         summary = chr(10).join(findings)
-
         prompt = ('You are a DevSecOps security expert analysing the UtopiaHire web application (FastAPI backend, React frontend, Firebase authentication). A Jenkins CI/CD pipeline just ran security scans. Based on these findings, provide exactly 3 numbered security recommendations. For each recommendation include: the vulnerability type, why it is dangerous for this specific application, and the exact code fix with a Python/FastAPI example. Be specific and actionable. Do not give generic advice.' + chr(10) + chr(10) + 'Pipeline scan findings:' + chr(10) + summary)
-
         try:
             response = requests.post('http://192.168.56.1:11434/api/generate', json={'model': 'llama3.1:8b', 'prompt': prompt, 'stream': False}, timeout=180)
             ai_text = response.json().get('response', 'No response received from LLaMA')
         except Exception as e:
             ai_text = ('LLaMA call failed: ' + str(e) + chr(10) + 'Raw findings:' + chr(10) + summary)
-
         output = ('AI Security Analysis - LLaMA 3.1:8b (Local)' + chr(10) + '=' * 55 + chr(10) + 'Pipeline: UtopiaHire' + chr(10) + 'Findings analysed: ' + str(len(findings)) + chr(10) + '=' * 55 + chr(10) + chr(10) + ai_text)
-
-        out_path = '/var/jenkins_home/workspace/utopiahire-pipeline/security-reports/ai-recommendations.txt'
-        with open(out_path, 'w') as f:
+        with open('/reports/ai-recommendations.txt', 'w') as f:
             f.write(output)
-
         print('AI recommendations saved.')
         print(output[:400])
         PYEOF
 
-                            pip install requests -q 2>/dev/null || true
-                            python3 /tmp/ai_analysis.py || true
+                            docker run --rm \
+                            -v /var/jenkins_home/workspace/utopiahire-pipeline/security-reports:/reports \
+                            -v /tmp/ai_analysis.py:/tmp/ai_analysis.py \
+                            python:3.11-slim sh -c "pip install requests -q && python3 /tmp/ai_analysis.py" || true
                         '''
                     }
                     post {
