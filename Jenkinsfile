@@ -409,8 +409,8 @@ pipeline {
 
                             docker run --rm \
                             -v /var/jenkins_home/workspace/utopiahire-pipeline/security-reports:/reports \
-                            -v /var/jenkins_home/workspace/utopiahire-pipeline/dashboard/ai_jenkins.py:/tmp/ai_analysis.py \
-                            python:3.11-slim sh -c "pip install requests -q && python3 /tmp/ai_analysis.py" || true
+                            -v /var/jenkins_home/workspace/utopiahire-pipeline/dashboard/ai_jenkins.py:/tmp/ai_jenkins.py \
+                            python:3.11-slim sh -c "pip install requests -q && python3 /tmp/ai_jenkins.py" || true
                         '''
                     }
                     post {
@@ -419,7 +419,7 @@ pipeline {
                                             allowEmptyArchive: true
                         }
                     }
-        }       
+        }      
 
         stage('Attack Simulation') {
             steps {
