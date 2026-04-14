@@ -2,7 +2,7 @@ import json, os, requests
 
 findings = []
 
-gl_path = '/reports/gitleaks-report.json'
+gl_path = '/var/jenkins_home/workspace/utopiahire-pipeline/security-reports/gitleaks-report.json'
 if os.path.exists(gl_path):
     try:
         d = json.load(open(gl_path))
@@ -14,7 +14,7 @@ if os.path.exists(gl_path):
     except:
         findings.append('Gitleaks: Could not read report')
 
-zp_path = '/reports/zap-report.json'
+zp_path = '/var/jenkins_home/workspace/utopiahire-pipeline/security-reports/zap-report.json'
 if os.path.exists(zp_path):
     try:
         d2 = json.load(open(zp_path))
@@ -45,7 +45,7 @@ except Exception as e:
 
 output = ('AI Security Analysis - LLaMA 3.1:8b (Local)' + chr(10) + '=' * 55 + chr(10) + 'Pipeline: UtopiaHire' + chr(10) + 'Findings analysed: ' + str(len(findings)) + chr(10) + '=' * 55 + chr(10) + chr(10) + ai_text)
 
-with open('/reports/ai-recommendations.txt', 'w') as f:
+with open('/var/jenkins_home/workspace/utopiahire-pipeline/security-reports/ai-recommendations.txt', 'w') as f:
     f.write(output)
 
 print('AI recommendations saved.')
