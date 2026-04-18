@@ -325,7 +325,7 @@ with tab1:
 
         try:
             gr = requests.get("http://localhost:9000/api/qualitygates/project_status",
-                params={"projectKey":"utopiahire"}, auth=("admin","admin"), timeout=3)
+                params={"projectKey":"utopiahire"}, auth=("admin","!Adminadmin123"), timeout=3)
             gate = gr.json().get("projectStatus",{}).get("status","UNKNOWN")
             ok = gate == "OK"
             st.markdown(f"""
@@ -342,7 +342,7 @@ with tab1:
         try:
             ir = requests.get("http://localhost:9000/api/issues/search",
                 params={"projectKeys":"utopiahire","types":"VULNERABILITY,BUG","ps":7},
-                auth=("admin","admin"), timeout=3)
+                auth=("admin","!Adminadmin123"), timeout=3)
             issues = ir.json().get("issues",[])
             if issues:
                 st.markdown(f'<div style="font-size:12px;font-weight:600;color:var(--white-60);margin-bottom:10px">{len(issues)} Issues Found</div>', unsafe_allow_html=True)
@@ -532,7 +532,7 @@ with tab4:
     except: pass
     try:
         r2=requests.get("http://localhost:9000/api/qualitygates/project_status",
-            params={"projectKey":"utopiahire"},auth=("admin","admin"),timeout=2)
+            params={"projectKey":"utopiahire"},auth=("admin","!Adminadmin123"),timeout=2)
         sq_s=r2.json().get("projectStatus",{}).get("status","?"); sq_cl="safe" if sq_s=="OK" else "critical"
     except: pass
     try:

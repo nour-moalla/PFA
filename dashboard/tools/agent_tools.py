@@ -61,7 +61,7 @@ def read_sonarqube_results() -> str:
                 "types": "VULNERABILITY",
                 "ps": 10
             },
-            auth=("admin", "admin"),
+            auth=("admin","!Adminadmin123"),
             timeout=5
         )
         if resp.status_code != 200:

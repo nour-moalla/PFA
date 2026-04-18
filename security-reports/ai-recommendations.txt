@@ -1,0 +1,59 @@
+AI Security Analysis - LLaMA 3.1:8b (Local)
+=======================================================
+Pipeline: UtopiaHire
+Findings analysed: 6
+=======================================================
+
+Based on the pipeline scan findings, here are three specific security recommendations for the UtopiaHire web application:
+
+**1. Vulnerability Type:** API Key Exposure (Secret Found)
+**Why it's dangerous for this application:** The exposure of a Generic API Key and GCP API key in the `.env` files poses a significant risk to the application's security. An attacker could exploit these secrets to gain unauthorized access to various services, leading to data breaches or other malicious activities.
+**Code Fix (Python/FastAPI example):**
+
+In `backend/.env`, replace:
+```python
+GCP_API_KEY="your-gcp-api-key"
+```
+With:
+```python
+GCP_API_KEY=$(echo "your-gcp-api-key" | base64)
+```
+And in your FastAPI app, use the base64-decoded API key when making requests to Google Cloud services.
+
+**2. Vulnerability Type:** Missing or Invalid Cross-Origin-Resource-Policy Header (ZAP MEDIUM ALERT)
+**Why it's dangerous for this application:** The absence of a valid Cross-Origin-Resource-Policy header allows an attacker to perform cross-site scripting (XSS) attacks, stealing sensitive user data or even taking control of the user's session.
+**Code Fix:**
+
+In your React frontend, add the following line to the `src/index.js` file:
+```javascript
+import { useEffect } from 'react';
+useEffect(() => {
+  document.addEventListener('DOMContentLoaded', () => {
+    const meta = document.createElement('meta');
+    meta.name = "cross-origin-resource-policy";
+    meta.content = "same-origin";
+    document.head.appendChild(meta);
+  });
+}, []);
+```
+This code adds a `meta` tag with the `cross-origin-resource-policy` attribute to the HTML header, ensuring that only same-origin requests are allowed.
+
+**3. Vulnerability Type:** Storable and Cacheable Content (ZAP MEDIUM ALERT)
+**Why it's dangerous for this application:** The presence of storable and cacheable content can lead to session fixation attacks or other forms of data theft, where an attacker intercepts sensitive user information stored in the browser's cache.
+**Code Fix:**
+
+In your React frontend, update the `src/index.js` file by adding the following code:
+```javascript
+import { useEffect } from 'react';
+
+useEffect(() => {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      // Clear sensitive data when the tab is re-focused
+      localStorage.clear();
+      sessionStorage.clear();
+    }
+  });
+}, []);
+```
+This code listens for changes in the browser's visibility and clears the local storage and session storage whenever the tab is re-focused, preventing an attacker from accessing stored sensitive information.

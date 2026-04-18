@@ -15,6 +15,9 @@ COPY . .
 # Remove node_modules again in case COPY brought Windows ones
 RUN rm -rf node_modules && npm install
 
+# Build production assets used by vite preview
+RUN npm run build
+
 # Add non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 RUN chown -R appuser:appgroup /app

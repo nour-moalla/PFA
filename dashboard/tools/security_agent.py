@@ -35,7 +35,8 @@ Be direct, specific, and beginner-friendly. Never give generic advice.
 def create_agent():
     llm = ChatOllama(
         model="llama3.1:8b",
-        temperature=0
+        temperature=0,
+        base_url="http://192.168.56.1:11434"
     )
     agent = create_react_agent(
         model=llm,

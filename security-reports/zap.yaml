@@ -3,7 +3,7 @@ env:
   - excludePaths: []
     name: baseline
     urls:
-    - http://utopiahire-backend:8000
+    - http://172.17.0.1:8000
   parameters:
     failOnError: true
     progressToStdout: false
@@ -14,7 +14,7 @@ jobs:
   type: passiveScan-config
 - parameters:
     maxDuration: 1
-    url: http://utopiahire-backend:8000
+    url: http://172.17.0.1:8000
   type: spider
 - parameters:
     maxDuration: 0
