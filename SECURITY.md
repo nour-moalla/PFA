@@ -71,7 +71,7 @@ The project uses and/or plans these DevSecOps controls in CI/CD:
 ## How to Report a Vulnerability
 If you discover a security issue, please report it responsibly:
 
-- Contact: ahmedmasmoudi16@gmail.com or nourmoalla70@gmail.com
+- Contact: nourmoalla70@gmail.com or ahmedmasmoudi16@gmail.com 
 - Include: clear reproduction steps, affected endpoint/module, impact, and suggested fix (if available).
 - Response target: initial acknowledgment within 72 hours.
 
