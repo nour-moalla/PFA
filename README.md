@@ -38,7 +38,7 @@ UtopiaHire is a full-stack AI-powered recruitment platform built for job seekers
 This repository implements a **complete DevSecOps security system** around the platform, covering three layers:
 
 - **Application hardening** — 10 vulnerabilities identified in Phase 0 and fully remediated
-- **Automated CI/CD security pipeline** — 16 Jenkins stages running on every GitHub push
+- **Automated CI/CD security pipeline** — 17 Jenkins stages running on every GitHub push
 - **AI security intelligence layer** — SVM classifier + LLaMA 3.1:8b agent + FAISS RAG knowledge base
 
 > All security components run **entirely on-premise**. No security data is sent to external APIs. No cloud inference. No recurring cost.
@@ -47,27 +47,51 @@ This repository implements a **complete DevSecOps security system** around the p
 
 ## Architecture
 
-┌─────────────────────────────────────────────────────────────────┐
-│                        APPLICATION LAYER                        │
-│   React Frontend (3000)  ──►  FastAPI Backend (8000)            │
-│           │                         │                           │
-│    Firebase Auth              OpenAI / AI API                   │
-└─────────────────────────────────────────────────────────────────┘
-│
-┌─────────────────────────────────────────────────────────────────┐
-│                       DEVSECOPS LAYER                           │
-│  Jenkins (8080) ──► SonarQube (9000) ──► Trivy ──► Checkov      │
-│  Gitleaks ──► pip-audit / npm-audit ──► OWASP ZAP               │
-│  Suricata IDS ──► iptables ──► Prometheus (9090) ──► Grafana    │
-└─────────────────────────────────────────────────────────────────┘
-│
-┌─────────────────────────────────────────────────────────────────┐
-│                      AI SECURITY LAYER                          │
-│  SVM Classifier (72.73% accuracy)                               │
-│  LLaMA 3.1:8b via Ollama ──► LangGraph ReAct Agent              │
-│  FAISS RAG ──► 839 NVD CVE documents ──► all-MiniLM-L6-v2       │
-│  Streamlit Dashboard (8501)                                     │
-└─────────────────────────────────────────────────────────────────┘
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        APPLICATION LAYER                            │
+│                                                                     │
+│   React Frontend (3000)  ──►  FastAPI Backend (8000)                │
+│                                    │                                │
+│                         ┌──────────┴──────────┐                     │
+│                    Firebase Auth          OpenAI / AI API           │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                         DEVSECOPS LAYER                             │
+│                                                                     │
+│   Jenkins (8080)                                                    │
+│   ├── Gitleaks          (secrets scanning)                          │
+│   ├── SonarQube (9000)  (SAST)                                      │
+│   ├── pip-audit / npm-audit  (dependency audit)                     │
+│   ├── Trivy             (container image scanning)                  │
+│   ├── Checkov           (IaC misconfiguration)                      │
+│   ├── OWASP ZAP         (DAST)                                      │
+│   └── Attack Simulation (controlled penetration tests)              │
+│                                                                     │
+│   Suricata IDS  ──►  iptables  ──►  Prometheus (9090)  ──►  Grafana │
+└─────────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       AI SECURITY LAYER                             │
+│                                                                     │
+│   SVM Classifier  ──────────────────  72.73% accuracy               │
+│        │                              86.36% precision              │
+│        │                                                            │
+│        ▼                                                            │
+│   LLaMA 3.1:8b (Ollama)  ──►  LangGraph ReAct Agent                 │
+│        │                           │                                │
+│        │                    5 live tools:                           │
+│        │                    Gitleaks · SonarQube · ZAP              │
+│        │                    Suricata · SVM Model                    │
+│        ▼                                                            │
+│   FAISS RAG  ──►  NVD CVE documents  ──►  all-MiniLM-L6-v2      │
+│                                                                     │
+│   Streamlit Dashboard (8501)                                        │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
